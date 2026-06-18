@@ -1,0 +1,157 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (must already exist; manual trigger only)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build wheel + sdist
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build hatchling
+
+      - name: Build sdist + wheel
+        run: python -m build
+
+      - name: List artifacts
+        run: ls -la dist/
+
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  verify:
+    name: smoke-test the built wheel
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install from wheel
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install dist/*.whl
+
+      - name: Smoke-test the installed package
+        run: |
+          python -c "from agent_shield import bash_guard, write_guard, GuardResult; r = bash_guard.check_command('rm -rf /'); assert r.decision == 'deny', f'Expected deny, got {r.decision}'; print('OK:', r.decision, '|', r.reason)"
+          echo '{"tool_input":{"command":"rm -rf /"}}' | python -m agent_shield.bash_guard | python -c 'import json,sys; d=json.load(sys.stdin)["hookSpecificOutput"]["permissionDecision"]; print("CLI decision:", d); assert d == "deny"'
+
+  publish-pypi:
+    name: publish to PyPI (OIDC trusted publishing)
+    needs: [build, verify]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/agent-shield/
+    permissions:
+      id-token: write   # required for PyPI trusted publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          # No password / API token — uses OIDC trusted-publisher config on PyPI side.
+          # Configure at: https://pypi.org/manage/account/publishing/
+
+  github-release:
+    name: create GitHub release
+    needs: [build, publish-pypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.tag }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Extract CHANGELOG section for this version
+        id: changelog
+        run: |
+          TAG="${{ needs.build.outputs.tag }}"
+          VERSION="${TAG#v}"
+          # Pull the section between this version's heading and the next heading
+          # Portable awk (works under mawk — the GitHub-Actions default — and gawk):
+          # use POSIX index() to test the heading prefix rather than gawk's 3-arg
+          # match() capture array, which mawk does not support.
+          awk -v ver="$VERSION" '
+            BEGIN { in_section=0; hdr="## [" ver "]" }
+            /^## \[/ {
+              if (in_section) exit
+              if (index($0, hdr) == 1) { in_section=1; print; next }
+            }
+            in_section { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "No CHANGELOG section found for version $VERSION; using a placeholder." > release-notes.md
+            echo "See CHANGELOG.md for full history." >> release-notes.md
+          fi
+          cat release-notes.md
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.build.outputs.tag }}
+          name: ${{ needs.build.outputs.tag }}
+          body_path: release-notes.md
+          files: dist/*
+          draft: false
+          prerelease: ${{ contains(needs.build.outputs.tag, 'a') || contains(needs.build.outputs.tag, 'b') || contains(needs.build.outputs.tag, 'rc') }}

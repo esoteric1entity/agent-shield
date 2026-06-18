@@ -1,0 +1,32 @@
+{
+  "__comment_top": "agent-shield Layer 4 wiring for Claude Code. Merge this 'hooks' section into your ~/.claude/settings.json. The Bash + Write/Edit matchers cover the two main attack surfaces; add more if your install has additional tool names.",
+
+  "hooks": {
+    "PreToolUse": [
+      {
+        "__comment": "Bash hook: every command the agent tries to run goes through bash_guard.check_command()",
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m agent_shield.bash_guard",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "__comment": "Write/Edit hook: every file path the agent tries to write or edit goes through write_guard.check_path()",
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m agent_shield.write_guard",
+            "timeout": 5000
+          }
+        ]
+      }
+    ]
+  },
+
+  "__comment_test": "After saving + restarting Claude Code, ask the agent to run `rm -rf /` — expected: hook denies with explanation. Ask it to read `~/.bashrc` — expected: hook allows. Ask it to write to `~/.claude/settings.json` — expected: hook denies (self-protect)."
+}

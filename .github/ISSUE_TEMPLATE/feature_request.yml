@@ -1,0 +1,57 @@
+name: Feature request
+description: Suggest a new feature, layer, or pattern
+labels: ["enhancement", "triage"]
+body:
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Which layer is this for?
+      description: agent-shield has an 8-layer architecture (see README). New features should map to a layer.
+      options:
+        - Layer 0 — Operational / Automation (cron, rotation)
+        - Layer 1 — Skill / Tool Vetting
+        - Layer 2 — Input Sanitization
+        - Layer 3 — Structured Output
+        - Layer 4 — Runtime Hooks (bash_guard / write_guard)
+        - Layer 5 — Network Egress
+        - Layer 6 — Structured Audit
+        - Layer 7 — Configuration
+        - Cross-layer / umbrella concern
+        - Not yet sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: threat
+    attributes:
+      label: What threat does this defend against?
+      description: agent-shield is threat-model-driven. New patterns should map to an adversary capability.
+      placeholder: "An agent attempts to ... by ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: How should agent-shield handle this case? (decision + reason)
+      placeholder: |
+        - Pattern: ...
+        - Tier: RED / YELLOW / GREEN
+        - Reason text: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any existing patterns this would replace, or designs you ruled out?
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope confirmation
+      options:
+        - label: This is in scope for agent-shield (threat-model-mapped; runs outside the agent; defensible without false-positive flood)
+          required: true

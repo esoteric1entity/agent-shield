@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling>=1.21.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agent-shield"
+version = "0.1.0a4"
+description = "Defensive overlay for AI agents — 8-layer architecture; v0.1.0 ships 6 layers (1 skill_vetting, 2 sanitize, 3 structured_output, 4 bash_guard+write_guard, 6 audit, 7 config)"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "esoteric1entity" },
+]
+keywords = ["ai-agents", "security", "claude-code", "openclaw", "guardrails", "hooks"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = []  # M2 has zero runtime deps (stdlib only)
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.0",
+]
+
+[project.scripts]
+agent-shield-bash-guard = "agent_shield.bash_guard:main"
+agent-shield-write-guard = "agent_shield.write_guard:main"
+agent-shield-vet = "agent_shield.skill_vetting:main"
+
+[project.urls]
+Homepage = "https://github.com/esoteric1entity/agent-shield"
+Issues = "https://github.com/esoteric1entity/agent-shield/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agent_shield"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"

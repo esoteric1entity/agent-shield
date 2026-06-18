@@ -1,0 +1,94 @@
+name: Bug report
+description: Report a defect in agent-shield's behavior (not a security vulnerability — see config)
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. **For security vulnerabilities, please use [Security Advisories](https://github.com/esoteric1entity/agent-shield/security/advisories/new) instead** — see [SECURITY.md](../../SECURITY.md).
+
+  - type: checkboxes
+    id: not-security
+    attributes:
+      label: Confirm this is not a security vulnerability
+      options:
+        - label: I confirm this issue is NOT a security vulnerability (an attacker-exploitable flaw, false-negative on a RED-tier pattern, or self-protection bypass). Security issues go through the private advisory channel.
+          required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One-sentence description of the bug
+      placeholder: "bash_guard incorrectly allows X under condition Y"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal reproducible example
+      placeholder: |
+        1. Install agent-shield 0.1.0a4
+        2. Run: `echo '{"tool_input":{"command":"..."}}' | python -m agent_shield.bash_guard`
+        3. Observe: ...
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: "Decision should be ask / deny / allow"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: "Decision was X with reason Y"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - bash_guard
+        - write_guard
+        - GuardResult / library API
+        - CLI hook output
+        - tests
+        - documentation
+        - other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: agent-shield version
+      placeholder: "0.1.0a4"
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "3.12.x"
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Ubuntu 24.04 / macOS 14 / Windows 11 + WSL2"
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context (logs, config, hook wiring, etc.)

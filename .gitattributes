@@ -1,0 +1,15 @@
+# agent-shield — line-ending + diff normalization.
+# Repo canonical is LF; shell scripts MUST stay LF on checkout (a CRLF in a .sh
+# breaks `bash` on Linux/macOS). Everything else normalizes to LF in the repo and
+# checks out per-platform (autocrlf), so working-tree EOL diffs are expected and benign.
+* text=auto
+*.sh text eol=lf
+*.py text
+*.md text
+*.toml text
+*.cff text
+*.json text
+*.yml text
+*.png binary
+*.jpg binary
+*.gif binary
