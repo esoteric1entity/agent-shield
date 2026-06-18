@@ -54,6 +54,29 @@ def test_clean_skill_is_approved(tmp_path):
     assert all(f.severity not in ("high", "critical") for f in result.findings)
 
 
+def test_cli_md_report_survives_legacy_console_encoding(tmp_path, monkeypatch):
+    """The md report's verdict line contains an em-dash. On a non-UTF-8/OEM
+    Windows console (cp850/cp437) an unguarded stdout write raised
+    UnicodeEncodeError, which was swallowed and returned a misleading exit 1
+    for a clean (approved) target. main() must reconfigure stdout so both the
+    report and the documented exit-code contract survive any console codepage.
+    """
+    import io
+
+    root = _skill(tmp_path, {"hello.py": "def greet(n):\n    return n\n"})
+    # Simulate a Windows OEM console that cannot encode the em-dash.
+    buf = io.BytesIO()
+    legacy = io.TextIOWrapper(buf, encoding="cp850", errors="strict", newline="")
+    monkeypatch.setattr(sys, "stdout", legacy)
+
+    rc = skill_vetting.main([str(root), "--format", "md"])
+
+    legacy.flush()
+    out = buf.getvalue().decode("utf-8", errors="replace")
+    assert rc == 0, f"clean (approved) target must exit 0; got {rc}"
+    assert "APPROVED" in out, f"verdict missing from report: {out!r}"
+
+
 def test_doc_mentioning_dangerous_command_is_not_flagged_as_code(tmp_path):
     # A README discussing `rm -rf` or os.environ must NOT trigger code-pattern
     # categories — those scan code files, not prose. (False-positive guard.)

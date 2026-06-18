@@ -38,6 +38,26 @@ from agent_shield._result import GuardResult
 _FLAGS: Final[int] = re.IGNORECASE | re.ASCII
 _FLAGS_ML: Final[int] = re.IGNORECASE | re.MULTILINE | re.ASCII
 
+# Recursive-force rm flag cluster — matches any bundling/ordering that contains
+# BOTH r and f (e.g. -rf, -fr, -rfv, -fvr, -vrf), so adding a verbose/extra flag
+# letter or reordering the cluster cannot bypass the rm-root protection. Bounded
+# quantifiers ({0,12}) keep it linear (ReDoS-safe) and POSIX-ERE-portable to the
+# bash mirror's `grep -E`. The root pattern below additionally tolerates an
+# end-of-options `--` and intervening option tokens before the target.
+_RM_RF: Final[str] = (
+    r"-([a-z]{0,12}r[a-z]{0,12}f[a-z]{0,12}|[a-z]{0,12}f[a-z]{0,12}r[a-z]{0,12})"
+)
+
+# Split-flag recursive-force form — r and f live in SEPARATE tokens
+# (`rm -r -f`, `-rv -f`, `-r -fv`, with optional intervening flag tokens between
+# them). Each token may bundle extra letters (same cluster idea as _RM_RF), so a
+# split where one side carries a verbose/extra flag still matches. Bounded
+# ({0,12}) for ReDoS safety; POSIX-ERE-portable to the bash mirror.
+_RM_SPLIT: Final[str] = (
+    r"(-[a-z]{0,12}r[a-z]{0,12}\s+(?:-{1,2}\S+\s+)*-[a-z]{0,12}f[a-z]{0,12}"
+    r"|-[a-z]{0,12}f[a-z]{0,12}\s+(?:-{1,2}\S+\s+)*-[a-z]{0,12}r[a-z]{0,12})"
+)
+
 # Input-size cap: bound the work so an oversized
 # command can't stall the hook into a timeout — a late/errored hook exit means
 # the call proceeds UNEVALUATED (a silent bypass). Over the cap we short-circuit
@@ -110,30 +130,50 @@ _RED_PATTERNS: Final[tuple[tuple[re.Pattern[str] | _LineStagedSearch, str], ...]
         # A trailing shell separator/terminator/quote
         # after `/` (`rm -rf /;`, `/&`, `/|cat`, `rm -rf /'`) resolves to root but
         # the old `(\s|$|\*)` tail downgraded it to YELLOW. Mirrored in bash-guard.sh.
-        re.compile(r"rm\s+-(rf|fr)\s+/([\s;&|<>)'\"]|$|\*)", _FLAGS),
+        re.compile(r"rm\s+" + _RM_RF + r"\s+(?:-{1,2}\S+\s+)*/([\s;&|<>)'\"]|$|\*)", _FLAGS),
         "Destructive rm -rf targeting root directory",
     ),
     # Cheap literal evasions of the above:
     # quoted root, split flags, home/cwd targets.
     (
-        re.compile(r"""rm\s+-(rf|fr)\s+["']/["']""", _FLAGS),
+        re.compile(r"rm\s+" + _RM_RF + r"""\s+(?:-{1,2}\S+\s+)*["']/["']""", _FLAGS),
         "Destructive rm -rf targeting root directory (quoted)",
     ),
     (
-        re.compile(r"rm\s+(-r\s+-f|-f\s+-r)\s+/(\s|$|\*)", _FLAGS),
+        re.compile(r"rm\s+" + _RM_SPLIT + r"\s+(?:-{1,2}\S+\s+)*/([\s;&|<>)'\"]|$|\*)", _FLAGS),
         "Destructive rm -rf targeting root directory (split flags)",
     ),
     (
-        re.compile(r"rm\s+-(rf|fr)\s+(~|\$HOME)/?([\s;&|<>)]|$)", _FLAGS),
+        re.compile(r"rm\s+" + _RM_RF + r"\s+(?:-{1,2}\S+\s+)*(~|\$HOME)/?([\s;&|<>)]|$)", _FLAGS),
         "Destructive rm -rf targeting home directory",
     ),
     (
-        re.compile(r"rm\s+-(rf|fr)\s+\.\.?([\s;&|<>)]|$)", _FLAGS),
+        re.compile(r"rm\s+" + _RM_RF + r"\s+(?:-{1,2}\S+\s+)*\.\.?([\s;&|<>)]|$)", _FLAGS),
         "Destructive rm -rf targeting current/parent directory",
     ),
     # Destructive rm targeting Windows system paths
     (
-        re.compile(r"rm\s+-(rf|fr)\s+/c/(Windows|Program|Users\s*$)", _FLAGS),
+        re.compile(r"rm\s+" + _RM_RF + r"\s+(?:-{1,2}\S+\s+)*/c/(Windows|Program|Users\s*$)", _FLAGS),
+        "Destructive rm -rf targeting system-critical Windows path",
+    ),
+    # Split-flag form (rm -r -f, -rv -f) at the non-root critical targets —
+    # mirrors the single-token cluster patterns above so RED coverage is uniform
+    # across quoted-root / home / parent / Windows for the split spelling too.
+    # (Split-form root is covered by the split-flag root pattern above.)
+    (
+        re.compile(r"rm\s+" + _RM_SPLIT + r"""\s+(?:-{1,2}\S+\s+)*["']/["']""", _FLAGS),
+        "Destructive rm -rf targeting root directory (quoted)",
+    ),
+    (
+        re.compile(r"rm\s+" + _RM_SPLIT + r"\s+(?:-{1,2}\S+\s+)*(~|\$HOME)/?([\s;&|<>)]|$)", _FLAGS),
+        "Destructive rm -rf targeting home directory",
+    ),
+    (
+        re.compile(r"rm\s+" + _RM_SPLIT + r"\s+(?:-{1,2}\S+\s+)*\.\.?([\s;&|<>)]|$)", _FLAGS),
+        "Destructive rm -rf targeting current/parent directory",
+    ),
+    (
+        re.compile(r"rm\s+" + _RM_SPLIT + r"\s+(?:-{1,2}\S+\s+)*/c/(Windows|Program|Users\s*$)", _FLAGS),
         "Destructive rm -rf targeting system-critical Windows path",
     ),
     # rm --no-preserve-root
@@ -255,12 +295,12 @@ _RED_PATTERNS: Final[tuple[tuple[re.Pattern[str] | _LineStagedSearch, str], ...]
 _YELLOW_PATTERNS: Final[tuple[tuple[re.Pattern[str], str], ...]] = (
     # Broad recursive deletes (caught here only if RED didn't trigger first)
     (
-        re.compile(r"rm\s+-(rf|fr)\s", _FLAGS),
+        re.compile(r"rm\s+" + _RM_RF + r"\s", _FLAGS),
         "Recursive force-delete — please confirm target is correct",
     ),
     # Split-flag form of the same: `rm -r -f <target>` off-root
     (
-        re.compile(r"rm\s+(-r\s+-f|-f\s+-r)\s", _FLAGS),
+        re.compile(r"rm\s+" + _RM_SPLIT + r"\s", _FLAGS),
         "Recursive force-delete — please confirm target is correct",
     ),
     # Network uploads with file data

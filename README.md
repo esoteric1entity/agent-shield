@@ -7,7 +7,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Status: alpha](https://img.shields.io/badge/Status-v0.1.0a4_alpha-yellow.svg)](#project-status)
 [![Python: ≥3.12](https://img.shields.io/badge/Python-%E2%89%A53.12-green.svg)](pyproject.toml)
-[![Tests: green](https://img.shields.io/badge/Tests-passing-brightgreen.svg)](#tests)
+[![Tests](https://github.com/esoteric1entity/agent-shield/actions/workflows/test.yml/badge.svg)](https://github.com/esoteric1entity/agent-shield/actions/workflows/test.yml)
 
 ---
 
@@ -116,7 +116,7 @@ Every check returns a `GuardResult` with one of three decisions:
 
 ### `bash_guard.check_command(cmd)` — patterns
 
-- **20 RED patterns**: destructive filesystem ops — `rm -rf` against root / home / cwd targets, including quoted (`rm -rf "/"`) and split-flag (`rm -r -f /`) forms, `--no-preserve-root`, `mkfs.*`, `format X:` / `wipefs`, `dd` onto block devices, fork bombs; remote-code execution — pipe-to-shell (`curl … | bash`), pipe-to-source, decode-and-execute (`base64 -d | sh`), process substitution (`bash <(curl …)`), encoded PowerShell; credential exfiltration — `$VAR` / `${VAR}` secrets in network commands, uploading secret files (`curl -d @id_rsa`), piping secret files to network tools.
+- **24 RED patterns**: destructive filesystem ops — `rm -rf` against root / home / cwd targets, including quoted (`rm -rf "/"`), split-flag (`rm -r -f /`), and bundled / reordered / intervening-flag (`rm -rfv /`, `rm -fvr /`, `rm -rf -- /`) forms, `--no-preserve-root`, `mkfs.*`, `format X:` / `wipefs`, `dd` onto block devices, fork bombs; remote-code execution — pipe-to-shell (`curl … | bash`), pipe-to-source, decode-and-execute (`base64 -d | sh`), process substitution (`bash <(curl …)`), encoded PowerShell; credential exfiltration — `$VAR` / `${VAR}` secrets in network commands, uploading secret files (`curl -d @id_rsa`), piping secret files to network tools.
 - **11 YELLOW patterns**: recursive force-deletes off-root (`rm -rf`, split-flag form, Windows `del /s`, `Remove-Item -Recurse -Force`, `shred`); network uploads; destructive git operations; package installs; `chmod 777`; Windows registry edits; service/process control.
 - **GREEN is not a pattern list** — it is the default: anything not matched by a RED or YELLOW pattern passes silently. There is no allowlist.
 
@@ -365,6 +365,7 @@ Layer 4 is a **best-effort regex layer, not a sandbox.** It raises the cost of a
 - **Fetch-then-execute in separate steps** — download to a file in one command, `bash file` in the next. Each step looks individually mundane.
 - **Aliases and functions** — `alias safe=rm; safe -rf /` defines the evasion before using it.
 - **Novel encodings** — we catch `base64 -d | sh` and `openssl enc -d | sh`; arbitrarily creative encode/decode chains are unbounded.
+- **Separator/word-split spellings and capability-equivalent verbs** — `rm${IFS}-rf${IFS}/` substitutes the literal spaces the patterns key on, and destructive verbs outside the matched set (e.g. `find … -delete`, `truncate … /dev/…`) are not pattern-matched. These need OS-level sandboxing, not regex.
 
 **Behavioral limitations** (by design, documented so you can plan around them):
 

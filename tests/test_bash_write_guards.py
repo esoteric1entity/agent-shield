@@ -111,6 +111,43 @@ BASH_GUARD_CASES = [
     ("chmod -R 777 /etc", "ask", "world-writable"),
     ("chmod 0777 /x", "ask", "world-writable"),
     ("echo chmod 777", "allow", None),
+    # Bundled-flag, reordered, and intervening-flag rm-root forms: the headline
+    # rm -rf / protection must not be bypassable by adding a verbose/extra flag
+    # letter, reordering the cluster, or inserting an end-of-options/intervening
+    # token. A non-recursive/non-force flag (e.g. -v alone) must NOT over-block.
+    ("rm -rfv /", "deny", "Destructive rm"),
+    ("rm -fvr /", "deny", "Destructive rm"),
+    ("rm -vrf /", "deny", "Destructive rm"),
+    ("rm -rf -- /", "deny", "Destructive rm"),
+    ("rm -rf -v /", "deny", "Destructive rm"),
+    ("rm -rf --one-file-system /", "deny", "Destructive rm"),
+    ("rm -rfv ./build", "ask", "force-delete"),
+    ("rm -v /", "allow", None),
+    # Split-cluster critical deletes: a split form where either flag token
+    # bundles an extra letter must still deny (same class as the bundled form),
+    # and intervening-flag/-- tolerance must be uniform across ALL RED targets
+    # (root, quoted-root, home, parent/cwd, Windows) — not root-only.
+    ("rm -rv -f /", "deny", "Destructive rm"),
+    ("rm -r -fv /", "deny", "Destructive rm"),
+    ("rm -vr -f /", "deny", "Destructive rm"),
+    ("rm -ri -f /", "deny", "Destructive rm"),
+    ("rm -fv -r /", "deny", "Destructive rm"),
+    ("rm -r -fv /home/me/x", "ask", "force-delete"),
+    ('rm -rf -- "/"', "deny", "Destructive rm"),
+    ("rm -rf -- ~", "deny", "Destructive rm"),
+    ("rm -rf -v ~", "deny", "Destructive rm"),
+    ("rm -rf -- ..", "deny", "Destructive rm"),
+    ("rm -rf -- /c/Windows", "deny", "Destructive rm"),
+    ("rm -rf -- ./build", "ask", "force-delete"),
+    ("rm -r -v /", "allow", None),
+    # Split-flag form at NON-root critical targets must deny too (uniform with
+    # the bundled single-token form), including with intervening flags.
+    ("rm -r -f ~", "deny", "Destructive rm"),
+    ("rm -rv -f ~", "deny", "Destructive rm"),
+    ("rm -r -fv ..", "deny", "Destructive rm"),
+    ("rm -ri -f /c/Windows", "deny", "Destructive rm"),
+    ("rm -r -f -- ~", "deny", "Destructive rm"),
+    ("rm -r -v /home/x", "allow", None),
     # Unicode-whitespace py<->bash parity (re.ASCII): non-ASCII space
     # is not a token separator in either port -> not a root deletion.
     ("rm -rf /", "allow", None),

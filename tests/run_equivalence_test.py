@@ -102,6 +102,37 @@ BASH_GUARD_CASES = [
     ("chmod -R 777 /etc", "ask"),
     ("chmod 0777 /x", "ask"),
     ("echo chmod 777", "allow"),
+    # Bundled-flag / reordered / intervening-flag rm-root forms must deny in
+    # both ports; an off-root cluster delete asks; a non-r/f flag stays allow.
+    ("rm -rfv /", "deny"),
+    ("rm -fvr /", "deny"),
+    ("rm -vrf /", "deny"),
+    ("rm -rf -- /", "deny"),
+    ("rm -rf -v /", "deny"),
+    ("rm -rf --one-file-system /", "deny"),
+    ("rm -rfv ./build", "ask"),
+    ("rm -v /", "allow"),
+    # Split-cluster + uniform intervening-flag coverage across RED targets.
+    ("rm -rv -f /", "deny"),
+    ("rm -r -fv /", "deny"),
+    ("rm -vr -f /", "deny"),
+    ("rm -ri -f /", "deny"),
+    ("rm -fv -r /", "deny"),
+    ("rm -r -fv /home/me/x", "ask"),
+    ('rm -rf -- "/"', "deny"),
+    ("rm -rf -- ~", "deny"),
+    ("rm -rf -v ~", "deny"),
+    ("rm -rf -- ..", "deny"),
+    ("rm -rf -- /c/Windows", "deny"),
+    ("rm -rf -- ./build", "ask"),
+    ("rm -r -v /", "allow"),
+    # Split-flag form at non-root critical targets must deny in both ports.
+    ("rm -r -f ~", "deny"),
+    ("rm -rv -f ~", "deny"),
+    ("rm -r -fv ..", "deny"),
+    ("rm -ri -f /c/Windows", "deny"),
+    ("rm -r -f -- ~", "deny"),
+    ("rm -r -v /home/x", "allow"),
     # Unicode-whitespace parity (re.ASCII): a non-ASCII "space" is not
     # a token separator in EITHER port, so these are not root deletions.
     ("rm -rf /", "allow"),

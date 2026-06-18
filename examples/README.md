@@ -19,7 +19,8 @@ Worked examples for the three most common integration patterns.
 # Back up your existing settings
 cp ~/.claude/settings.json ~/.claude/settings.json.bak
 
-# Merge the example into your settings (manually or via a JSON tool)
+# Append the two PreToolUse entries into your existing hooks.PreToolUse array
+# (create hooks/hooks.PreToolUse only if absent; do NOT replace them).
 # See claude-code-settings.example.json for the exact structure
 
 # Restart Claude Code — it picks up the new hooks on next session

@@ -115,21 +115,31 @@ BLOCK_REASON=""
 # Destructive rm targeting critical paths
 # (RED greps scan $SCAN_TEXT: the extracted command, plus the raw hook JSON
 #  when no Python is available — see fail-closed hardening note above.)
-if echo "$SCAN_TEXT" | grep -qEi 'rm\s+-(rf|fr)\s+/([[:space:];&|<>)'\''"]|$|\*)'; then
+if echo "$SCAN_TEXT" | grep -qEi 'rm\s+-([a-z]{0,12}r[a-z]{0,12}f[a-z]{0,12}|[a-z]{0,12}f[a-z]{0,12}r[a-z]{0,12})\s+(-{1,2}\S+\s+)*/([[:space:];&|<>)'\''"]|$|\*)'; then
     BLOCK_REASON="Destructive rm -rf targeting root directory"
 
 # Cheap literal evasions: quoted root,
 # split flags, home/cwd targets. Mirrored in agent_shield/bash_guard.py.
-elif echo "$SCAN_TEXT" | grep -qEi 'rm\s+-(rf|fr)\s+["'\'']/["'\'']'; then
+elif echo "$SCAN_TEXT" | grep -qEi 'rm\s+-([a-z]{0,12}r[a-z]{0,12}f[a-z]{0,12}|[a-z]{0,12}f[a-z]{0,12}r[a-z]{0,12})\s+(-{1,2}\S+\s+)*["'\'']/["'\'']'; then
     BLOCK_REASON="Destructive rm -rf targeting root directory (quoted)"
-elif echo "$SCAN_TEXT" | grep -qEi 'rm\s+(-r\s+-f|-f\s+-r)\s+/(\s|$|\*)'; then
+elif echo "$SCAN_TEXT" | grep -qEi 'rm\s+(-[a-z]{0,12}r[a-z]{0,12}\s+(-{1,2}\S+\s+)*-[a-z]{0,12}f[a-z]{0,12}|-[a-z]{0,12}f[a-z]{0,12}\s+(-{1,2}\S+\s+)*-[a-z]{0,12}r[a-z]{0,12})\s+(-{1,2}\S+\s+)*/([[:space:];&|<>)'\''"]|$|\*)'; then
     BLOCK_REASON="Destructive rm -rf targeting root directory (split flags)"
-elif echo "$SCAN_TEXT" | grep -qEi 'rm\s+-(rf|fr)\s+(~|\$HOME)/?([[:space:];&|<>)]|$)'; then
+elif echo "$SCAN_TEXT" | grep -qEi 'rm\s+-([a-z]{0,12}r[a-z]{0,12}f[a-z]{0,12}|[a-z]{0,12}f[a-z]{0,12}r[a-z]{0,12})\s+(-{1,2}\S+\s+)*(~|\$HOME)/?([[:space:];&|<>)]|$)'; then
     BLOCK_REASON="Destructive rm -rf targeting home directory"
-elif echo "$SCAN_TEXT" | grep -qEi 'rm\s+-(rf|fr)\s+\.\.?([[:space:];&|<>)]|$)'; then
+elif echo "$SCAN_TEXT" | grep -qEi 'rm\s+-([a-z]{0,12}r[a-z]{0,12}f[a-z]{0,12}|[a-z]{0,12}f[a-z]{0,12}r[a-z]{0,12})\s+(-{1,2}\S+\s+)*\.\.?([[:space:];&|<>)]|$)'; then
     BLOCK_REASON="Destructive rm -rf targeting current/parent directory"
 
-elif echo "$SCAN_TEXT" | grep -qEi 'rm\s+-(rf|fr)\s+/c/(Windows|Program|Users\s*$)'; then
+elif echo "$SCAN_TEXT" | grep -qEi 'rm\s+-([a-z]{0,12}r[a-z]{0,12}f[a-z]{0,12}|[a-z]{0,12}f[a-z]{0,12}r[a-z]{0,12})\s+(-{1,2}\S+\s+)*/c/(Windows|Program|Users\s*$)'; then
+    BLOCK_REASON="Destructive rm -rf targeting system-critical Windows path"
+# Split-flag form (rm -r -f / -rv -f) at the non-root critical targets — mirrors
+# the single-token patterns so RED coverage is uniform across spellings.
+elif echo "$SCAN_TEXT" | grep -qEi 'rm\s+(-[a-z]{0,12}r[a-z]{0,12}\s+(-{1,2}\S+\s+)*-[a-z]{0,12}f[a-z]{0,12}|-[a-z]{0,12}f[a-z]{0,12}\s+(-{1,2}\S+\s+)*-[a-z]{0,12}r[a-z]{0,12})\s+(-{1,2}\S+\s+)*["'\'']/["'\'']'; then
+    BLOCK_REASON="Destructive rm -rf targeting root directory (quoted)"
+elif echo "$SCAN_TEXT" | grep -qEi 'rm\s+(-[a-z]{0,12}r[a-z]{0,12}\s+(-{1,2}\S+\s+)*-[a-z]{0,12}f[a-z]{0,12}|-[a-z]{0,12}f[a-z]{0,12}\s+(-{1,2}\S+\s+)*-[a-z]{0,12}r[a-z]{0,12})\s+(-{1,2}\S+\s+)*(~|\$HOME)/?([[:space:];&|<>)]|$)'; then
+    BLOCK_REASON="Destructive rm -rf targeting home directory"
+elif echo "$SCAN_TEXT" | grep -qEi 'rm\s+(-[a-z]{0,12}r[a-z]{0,12}\s+(-{1,2}\S+\s+)*-[a-z]{0,12}f[a-z]{0,12}|-[a-z]{0,12}f[a-z]{0,12}\s+(-{1,2}\S+\s+)*-[a-z]{0,12}r[a-z]{0,12})\s+(-{1,2}\S+\s+)*\.\.?([[:space:];&|<>)]|$)'; then
+    BLOCK_REASON="Destructive rm -rf targeting current/parent directory"
+elif echo "$SCAN_TEXT" | grep -qEi 'rm\s+(-[a-z]{0,12}r[a-z]{0,12}\s+(-{1,2}\S+\s+)*-[a-z]{0,12}f[a-z]{0,12}|-[a-z]{0,12}f[a-z]{0,12}\s+(-{1,2}\S+\s+)*-[a-z]{0,12}r[a-z]{0,12})\s+(-{1,2}\S+\s+)*/c/(Windows|Program|Users\s*$)'; then
     BLOCK_REASON="Destructive rm -rf targeting system-critical Windows path"
 elif echo "$SCAN_TEXT" | grep -qEi 'rm\s+--no-preserve-root'; then
     BLOCK_REASON="rm with --no-preserve-root flag"
@@ -204,11 +214,11 @@ fi
 ASK_REASON=""
 
 # Broad recursive deletes (not targeting root, but still risky)
-if echo "$CMD" | grep -qEi 'rm\s+-(rf|fr)\s'; then
+if echo "$CMD" | grep -qEi 'rm\s+-([a-z]{0,12}r[a-z]{0,12}f[a-z]{0,12}|[a-z]{0,12}f[a-z]{0,12}r[a-z]{0,12})\s'; then
     ASK_REASON="Recursive force-delete — please confirm target is correct"
 
 # Split-flag form of the same: `rm -r -f <target>` off-root
-elif echo "$CMD" | grep -qEi 'rm\s+(-r\s+-f|-f\s+-r)\s'; then
+elif echo "$CMD" | grep -qEi 'rm\s+(-[a-z]{0,12}r[a-z]{0,12}\s+(-{1,2}\S+\s+)*-[a-z]{0,12}f[a-z]{0,12}|-[a-z]{0,12}f[a-z]{0,12}\s+(-{1,2}\S+\s+)*-[a-z]{0,12}r[a-z]{0,12})\s'; then
     ASK_REASON="Recursive force-delete — please confirm target is correct"
 
 # Network uploads with file data

@@ -1,5 +1,5 @@
 {
-  "__comment_top": "agent-shield Layer 4 wiring for Claude Code. Merge this 'hooks' section into your ~/.claude/settings.json. The Bash + Write/Edit matchers cover the two main attack surfaces; add more if your install has additional tool names.",
+  "__comment_top": "agent-shield Layer 4 wiring for Claude Code. APPEND these two PreToolUse entries to your existing hooks.PreToolUse array — do NOT replace the hooks object or the array (create hooks.PreToolUse if it is absent). It is normal and correct to end up with more than one entry for the same matcher; Claude Code runs all matching hooks and deduplicates byte-identical commands. The Bash + Write/Edit matchers cover the two main attack surfaces; add more if your install has additional tool names. NOTE: 'timeout' is in SECONDS (Claude Code's default is 600); the guards finish in well under a second, so 5 is ample.",
 
   "hooks": {
     "PreToolUse": [
@@ -10,7 +10,7 @@
           {
             "type": "command",
             "command": "python -m agent_shield.bash_guard",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       },
@@ -21,7 +21,7 @@
           {
             "type": "command",
             "command": "python -m agent_shield.write_guard",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       }

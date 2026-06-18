@@ -1,0 +1,9 @@
+version: 2
+updates:
+  # Keep the GitHub Actions used by CI and the release workflow current, so the
+  # mutable major-version tags (e.g. actions/checkout@v4) are tracked to their
+  # latest patched commit rather than drifting silently.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

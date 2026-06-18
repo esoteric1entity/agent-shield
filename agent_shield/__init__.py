@@ -14,21 +14,24 @@ would make `python -m agent_shield.bash_guard` emit a RuntimeWarning
 
 from agent_shield._result import GuardResult
 
-# Single-source the version from installed package metadata so it can't drift
-# from pyproject.toml. Falls back to a literal only when running from a source
-# tree that was never installed (e.g. a raw git checkout).
-try:
-    from importlib.metadata import (
-        PackageNotFoundError as _PackageNotFoundError,
-        version as _pkg_version,
-    )
 
+def _resolve_version() -> str:
+    """Single-source the version from installed package metadata so it can't
+    drift from pyproject.toml. Falls back to a literal only when running from a
+    source tree that was never installed (e.g. a raw git checkout). The
+    importlib.metadata names stay function-local — never bound at module scope.
+    """
     try:
-        __version__ = _pkg_version("agent-shield")
-    except _PackageNotFoundError:
-        __version__ = "0.1.0a4"
-except ImportError:  # pragma: no cover - importlib.metadata is stdlib on 3.12
-    __version__ = "0.1.0a4"
+        from importlib.metadata import PackageNotFoundError, version
+    except ImportError:  # pragma: no cover - importlib.metadata is stdlib on 3.12
+        return "0.1.0a4"
+    try:
+        return version("agent-shield")
+    except PackageNotFoundError:
+        return "0.1.0a4"
+
+
+__version__ = _resolve_version()
 
 __all__ = ["GuardResult", "bash_guard", "write_guard", "skill_vetting",
            "sanitize", "structured_output", "audit", "config"]

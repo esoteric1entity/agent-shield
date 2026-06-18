@@ -50,10 +50,14 @@ Confirm the installed version matches the source: `python -c "import agent_shiel
 The hooks file is **user-owned and security-sensitive** (`~/.claude/settings.json`,
 or `.claude/settings.json` for project scope — ask which the user wants).
 
-1. Read the current settings file (if any) and construct the merged result per
-   `examples/claude-code-settings.example.json` — two `PreToolUse` entries:
+1. Read the current settings file (if any) and **append** the two `PreToolUse`
+   entries from `examples/claude-code-settings.example.json` to the existing
+   `hooks.PreToolUse` array — creating `hooks` / `hooks.PreToolUse` only if
+   absent. Do **not** replace the `hooks` object or the array. The two entries:
    `Bash` → `python -m agent_shield.bash_guard`, `Write|Edit|MultiEdit` →
-   `python -m agent_shield.write_guard`.
+   `python -m agent_shield.write_guard`. It is normal for the same matcher to
+   appear more than once; Claude Code runs all matching hooks and deduplicates
+   byte-identical commands.
 2. **Show the user the exact before/after diff. Do not write without approval.**
 3. Never remove or alter existing hooks — merge only. If a conflicting matcher
    exists, show it and let the user decide.

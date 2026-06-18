@@ -372,6 +372,15 @@ def _render_md(result: VetResult) -> str:
 def main(argv: list[str] | None = None) -> int:
     import argparse
 
+    # Windows OEM consoles (cp850/cp437/cp932) cannot encode the report's
+    # em-dash glyph; an unguarded stdout write would raise UnicodeEncodeError,
+    # which the catch-all below would swallow and return a misleading exit 1 for
+    # a clean target. Reconfigure the streams to UTF-8 so both the human report
+    # and the documented exit-code contract survive any console codepage.
+    for _stream in (sys.stdout, sys.stderr):
+        if hasattr(_stream, "reconfigure"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(
         prog="agent_shield.skill_vetting",
         description="Statically vet a skill/tool/package; exit 0=approved, 1=review, 2=rejected.",

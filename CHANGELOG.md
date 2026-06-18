@@ -20,16 +20,20 @@ Triaged as polish rather than blockers; deferred so each gets its own design and
 - **L6 `Anchor` zero-cadence footgun** — warn (or raise) when both `every_n=0` and `every_minutes=0` but a sink/shipper is supplied (anchoring is silently disabled).
 - **L7 `STRICT_SANITIZE_COMPLIANCE`** — derive sanitize strictness from a preset attribute, to close a forward-compat gap for a future high-posture preset.
 - **Packaging** — a PEP-562 module `__getattr__` so `agent_shield.bash_guard` resolves after a bare `import agent_shield` while keeping the no-eager-import property.
+- **L1 `skill_vetting` walker hardening** — guard an empty-string path (currently resolves to the CWD), treat Windows device paths (`NUL` / `CON`) as unscannable rather than `approved`, bound symlink / junction traversal to the target tree, and add an aggregate file-count / total-byte budget so a hostile package can't soft-DoS the scan.
+- **L1 CLI** — confine the UTF-8 stdout/stderr reconfigure to the CLI entry so an in-process `main()` embedder's streams are not mutated.
+- **Docs (L6)** — note `allow_nan=False` in the audit canonical-serialization snippet.
 
 ## [0.1.0a4] — 2026-06-17 — readiness-hardening alpha
 
 ### Security & readiness hardening
 Hardening from an independent adversarial review: cases the suite had not previously exercised were found and closed, each test-first, with the two Layer-4 ports kept decision-equivalent.
 
-**Test suite after this hardening: 861 tests, all green; Python↔bash decision-equivalence 98/98.**
+**Test suite after this hardening: 916 tests, all green; Python↔bash decision-equivalence 125/125.**
 
 - **L4 `write_guard` — self-protection bypasses closed.** Path normalization now collapses redundant separators and resolves `.`/`..` dot-segments, so spellings that resolve to a guarded file (`agent_shield//bash_guard.py`, `/./`, `/x/../`, `x/.claude//settings.json`, `home/.ssh//id_rsa`, `.openclaw//.env`) can no longer dodge the `$`-anchored RED patterns. Mirrored in the bash source, with a degraded sed fallback for the no-Python case.
 - **L4 `bash_guard` — wrapping / fork-bomb / rm-root bypasses closed.** A shell-invocation / `eval` / `xargs` lead-in is now treated as a command introducer, so a destructive verb inside `bash -c '…'` / `eval …` / `xargs …` is caught; the fork-bomb matcher is whitespace-tolerant; the `rm -rf /` (and `~` / `$HOME` / `.` / `..`) trailing sets now include shell metacharacters, so `rm -rf /; …` no longer downgrades to YELLOW. Mirrored in the bash source.
+- **L4 `bash_guard` — recursive-force flag-cluster bypasses closed.** `rm` deletes of critical targets now deny for any flag bundling/ordering that contains both `-r` and `-f` — `rm -rfv /`, `rm -fvr /`, reordered clusters, and split forms where a token carries an extra letter (`rm -rv -f /`, `rm -r -fv /`) — and an end-of-options `--` or an intervening flag before the target no longer downgrades the block, uniformly across root / quoted-root / home / parent / Windows targets. Bounded matchers keep it ReDoS-safe. Mirrored in the bash source.
 - **L4 — py↔bash whitespace parity; `chmod 777` widened; input-size cap.** All `bash_guard` patterns compile with `re.ASCII` so `\s` / `\w` / `\b` match the grep mirror's ASCII classes exactly; `chmod 777` now covers `-R` / split / verbose flags and octal `0777`, command-anchored; oversized input short-circuits to a conservative `ask` (never a silent `allow`), mirrored in both `.sh` hooks.
 - **L1 `skill_vetting` — robustness.** A valid-JSON but non-dict `package.json` no longer raises (the "never raises" contract holds); a file over the size cap now emits an `UNSCANNED` finding and floors the tier away from `approved` (padded-past-the-cap malware can no longer score 0 → approved).
 - **L2 `sanitize` — bounded NFKC.** NFKC now runs in combining-safe chunks with a cumulative-output budget and a pathological-expansion circuit breaker, so a compatibility expander no longer stalls the sanitizer; benign input of any length is still fully normalized, and the NFKC and scan budgets are aligned so there is no partial-fold evasion gap.
