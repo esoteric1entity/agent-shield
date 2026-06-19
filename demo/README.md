@@ -21,25 +21,30 @@ Requires agent-shield installed (`pip install agent-shield`, or `pip install -e 
 from a checkout). Pure Python — no other dependencies. Point the demo at a
 specific interpreter with `PYTHON=/path/to/python bash demo/demo.sh`.
 
-## The static card in the README
+## The card in the README
 
-[`../docs/assets/demo-bash-guard.svg`](../docs/assets/demo-bash-guard.svg) is a
-committed, version-controlled snapshot of this same output, so the README renders
-a visual everywhere with no binary blob. It reflects the guard's actual decisions
-and reasons; regenerate it by hand if those change.
+The README's "See it in action" section embeds an animated card,
+[`../docs/assets/demo-bash-guard.gif`](../docs/assets/demo-bash-guard.gif), that
+reveals the three decisions in sequence. A static twin,
+[`../docs/assets/demo-bash-guard.svg`](../docs/assets/demo-bash-guard.svg), is kept
+for contexts where a GIF isn't wanted. Both show the guard's actual decisions and
+reason strings.
 
-## Recording an animated GIF / asciinema (optional)
+## Regenerating the card
 
-The script is written to record cleanly. With
-[asciinema](https://asciinema.org/) and [agg](https://github.com/asciinema/agg):
+The animated GIF is rendered by [`render_card.py`](render_card.py) — a dev tool
+(needs `pip install Pillow` and a monospace font: Consolas on Windows, DejaVu Sans
+Mono on Linux). It is **not** part of the shipped package, which stays stdlib-only.
+
+```bash
+python demo/render_card.py        # writes docs/assets/demo-bash-guard.gif
+```
+
+`render_card.py` and the `.svg` are stylized cards, **not** screen recordings. For
+an authentic live capture of an actual run, record `demo.sh` with
+[asciinema](https://asciinema.org/) + [agg](https://github.com/asciinema/agg):
 
 ```bash
 asciinema rec demo.cast --overwrite -c "bash demo/demo.sh"
-agg demo.cast docs/assets/demo-bash-guard.gif          # animated GIF
-# or, for a scalable SVG cast:
-#   npm i -g svg-term-cli
-#   svg-term --in demo.cast --out docs/assets/demo-bash-guard-cast.svg
+agg demo.cast docs/assets/demo-bash-guard.gif
 ```
-
-Then reference the recording from the README alongside (or in place of) the
-static card.

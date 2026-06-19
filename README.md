@@ -28,7 +28,7 @@ Layers 0 (operational/automation) and 5 (network egress) are in development.
 
 ## See it in action
 
-![agent-shield blocking a destructive command (deny), prompting on a risky one (ask), and allowing a safe one (allow)](docs/assets/demo-bash-guard.svg)
+![agent-shield blocking a destructive command (deny), prompting on a risky one (ask), and allowing a safe one (allow)](docs/assets/demo-bash-guard.gif)
 
 *The Layer 4 hook's actual decisions and reason strings, rendered for readability — the live hook emits them as JSON. A safe command prints nothing and exits 0; only `ask` and `deny` emit output. Run the three checks yourself: [`demo/demo.sh`](demo/demo.sh).*
 
