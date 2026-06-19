@@ -26,6 +26,14 @@ Layers 0 (operational/automation) and 5 (network egress) are in development.
 
 ---
 
+## See it in action
+
+![agent-shield blocking a destructive command (deny), prompting on a risky one (ask), and allowing a safe one (allow)](docs/assets/demo-bash-guard.svg)
+
+*The Layer 4 hook's actual decisions and reason strings, rendered for readability — the live hook emits them as JSON. A safe command prints nothing and exits 0; only `ask` and `deny` emit output. Run the three checks yourself: [`demo/demo.sh`](demo/demo.sh).*
+
+---
+
 ## Quick start
 
 **Prerequisites:** Python 3.12+ (standard library only — zero runtime dependencies). On Windows, run the shell commands in Git Bash, WSL, or PowerShell (adapt as needed); the guards themselves are pure Python.
@@ -245,7 +253,7 @@ log = audit.AuditLog("audit.jsonl",
 
 The anchor periodically (every N entries or T minutes — never per-event) copies a minimal receipt — `{seq, entry_hash, ts}`, no PII — to its target, fail-open: a *failing* shipper never blocks the audited write. **Resistance holds only when that target is genuinely independent** — a separate / write-once volume or another host; an anchor on the **same volume** as the log is not independent and stays tamper-evident only.
 
-**agent-shield never phones home.** The shipped package contains **no networking code** — the built-in anchor writes to a local path only. To anchor off-box, you **bring your own shipper** (a callable that transmits the receipt however you choose); the egress is your code and your policy. There is no `url`/`endpoint` parameter, and the no-network guarantee is checked by a best-effort AST lint in the test suite (not a sandbox). Your shipper runs **synchronously, in-process** and cannot be timed out in v0.1 — keep it fast, or do slow/network work asynchronously yourself. A ready-to-copy recipe and a full risk guide live in [`examples/remote_anchor_shipper.py`](examples/remote_anchor_shipper.py) and [`docs/REMOTE_ANCHORING.md`](docs/REMOTE_ANCHORING.md).
+**agent-shield never phones home.** The shipped package makes **no outbound network calls** — its only socket use is a local `gethostname()` for the audit machine field, and the built-in anchor writes to a local path only. To anchor off-box, you **bring your own shipper** (a callable that transmits the receipt however you choose); the egress is your code and your policy. There is no `url`/`endpoint` parameter, and the no-network guarantee is checked by a best-effort AST lint in the test suite (not a sandbox). Your shipper runs **synchronously, in-process** and cannot be timed out in v0.1 — keep it fast, or do slow/network work asynchronously yourself. A ready-to-copy recipe and a full risk guide live in [`examples/remote_anchor_shipper.py`](examples/remote_anchor_shipper.py) and [`docs/REMOTE_ANCHORING.md`](docs/REMOTE_ANCHORING.md).
 
 Full field reference, verification procedure, and limits: [`docs/AUDIT_SCHEMA.md`](docs/AUDIT_SCHEMA.md).
 
@@ -375,6 +383,20 @@ Layer 4 is a **best-effort regex layer, not a sandbox.** It raises the cost of a
 - **Substring conservatism.** Destructive-verb patterns are anchored to command position to avoid flagging `grep mkfs log`, but a guard built from regexes will always have residual false-positive/false-negative trade-offs at the margins.
 
 If your threat model requires *guarantees* against a determined adversarial agent, you need OS-level sandboxing (containers, VMs, seccomp, restricted users) underneath this layer. agent-shield is the seatbelt, not the cage.
+
+---
+
+## Why you can trust this
+
+agent-shield is a security tool from an independent author — so it's built to be **verified, not taken on faith**:
+
+- **Auditable by design.** Zero runtime dependencies — Python ≥3.12 standard library only. The guards are a handful of readable modules, with an inline threat-model comment on every pattern; you can read the whole enforcement surface before you trust it.
+- **It never phones home.** The shipped package makes **no outbound network calls** — its only socket use is a local `gethostname()` for the audit record. The optional audit anchor writes to a local path only; to send anything off-box you supply your own shipper (your code, your policy). The no-egress property is checked by a best-effort AST lint in the test suite.
+- **Test-first, then adversarially reviewed.** Changes are developed red→green; every release additionally goes through an independent review pass tasked with *breaking* the change rather than approving it. The full test suite — guard logic, CLI/hook contract, security regressions, doc-claims, and Python↔bash decision-equivalence — must be green before any release is tagged, and the pattern counts quoted in this README are themselves test-asserted, so code and docs can't drift.
+- **It protects itself.** Writes to its own guard modules and to your hook / permission config are blocked, so an agent under the shield can't quietly disable it.
+- **The audit trail is tamper-evident.** The forensic log is hash-chained — any edit, insertion, deletion, or reorder is detectable (and tamper-*resistant* when anchored to an independent target).
+- **Honest about scope.** Apache-2.0, alpha-labeled, and explicit about what it does *not* do — see [Bypasses and limitations](#bypasses-and-limitations), the [Security model](#security-model), and [`SECURITY.md`](SECURITY.md).
+- **Provenance.** Built by `esoteric1entity` — a PDuk Brainworks project — AI-assisted under human architectural direction. Vulnerability disclosure policy: [`SECURITY.md`](SECURITY.md).
 
 ---
 

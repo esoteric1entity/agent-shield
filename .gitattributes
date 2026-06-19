@@ -10,6 +10,7 @@
 *.cff text
 *.json text
 *.yml text
+*.svg text
 *.png binary
 *.jpg binary
 *.gif binary

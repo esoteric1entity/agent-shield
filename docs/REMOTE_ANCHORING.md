@@ -7,7 +7,7 @@ anchor writes to a local path; this guide covers the **opt-in** case where you
 want to anchor to a **remote** endpoint instead.
 
 > **The trade-off, stated plainly.** agent-shield **never phones home** — the
-> shipped package contains no networking code, and a test enforces that. Remote
+> shipped package makes no outbound network calls — its only socket use is a local hostname lookup — and a test enforces that. Remote
 > anchoring is achieved with a **bring your own shipper**: a small callable *you*
 > supply that transmits the head to *your* endpoint. Enabling it means **your
 > deployment** now makes an outbound call — you are choosing to opt *your setup*

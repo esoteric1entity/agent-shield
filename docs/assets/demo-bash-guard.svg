@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" width="900" height="300" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" role="img" aria-label="agent-shield Layer 4 bash_guard: denies rm -rf slash, asks on git push --force, allows ls -la">
+  <rect x="1" y="1" width="898" height="298" rx="12" fill="#0d1117" stroke="#30363d" stroke-width="1.5"/>
+
+  <!-- title bar -->
+  <circle cx="28" cy="26" r="6" fill="#ff5f56"/>
+  <circle cx="48" cy="26" r="6" fill="#febc2e"/>
+  <circle cx="68" cy="26" r="6" fill="#27c93f"/>
+  <text x="96" y="31" font-size="13" fill="#8b949e">agent-shield · Layer 4 · bash_guard (PreToolUse hook)</text>
+  <line x1="0" y1="48" x2="900" y2="48" stroke="#30363d" stroke-width="1"/>
+
+  <!-- case 1: deny -->
+  <text x="24" y="84" font-size="13" xml:space="preserve"><tspan fill="#56d364">$ </tspan><tspan fill="#c9d1d9">echo '{"tool_input":{"command":"rm -rf /"}}' | python -m agent_shield.bash_guard</tspan></text>
+  <text x="40" y="108" font-size="13" xml:space="preserve"><tspan fill="#8b949e">permissionDecision: </tspan><tspan fill="#ff7b72" font-weight="700">deny</tspan><tspan fill="#8b949e">  —  </tspan><tspan fill="#c9d1d9">"Destructive rm -rf targeting root directory"</tspan></text>
+
+  <!-- case 2: ask -->
+  <text x="24" y="146" font-size="13" xml:space="preserve"><tspan fill="#56d364">$ </tspan><tspan fill="#c9d1d9">echo '{"tool_input":{"command":"git push --force origin main"}}' | python -m agent_shield.bash_guard</tspan></text>
+  <text x="40" y="170" font-size="13" xml:space="preserve"><tspan fill="#8b949e">permissionDecision: </tspan><tspan fill="#e3b341" font-weight="700">ask</tspan><tspan fill="#8b949e">  —  </tspan><tspan fill="#c9d1d9">"Destructive git operation — may lose commit history or untracked files"</tspan></text>
+
+  <!-- case 3: allow -->
+  <text x="24" y="208" font-size="13" xml:space="preserve"><tspan fill="#56d364">$ </tspan><tspan fill="#c9d1d9">echo '{"tool_input":{"command":"ls -la"}}' | python -m agent_shield.bash_guard</tspan></text>
+  <text x="40" y="232" font-size="13" xml:space="preserve"><tspan fill="#6e7681">(no output — </tspan><tspan fill="#56d364" font-weight="700">allowed</tspan><tspan fill="#6e7681">, exit 0)</tspan></text>
+
+  <!-- footer -->
+  <line x1="0" y1="256" x2="900" y2="256" stroke="#30363d" stroke-width="1"/>
+  <text x="24" y="281" font-size="12" fill="#6e7681">Real decisions · a safe command prints nothing (exit 0) · only ask / deny emit JSON · zero runtime dependencies</text>
+</svg>

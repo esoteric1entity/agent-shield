@@ -172,8 +172,7 @@ log = audit.AuditLog(
 
 ### never phones home
 
-**agent-shield ships no network code.** The built-in anchor shipper writes only to
-a local filesystem path. To anchor off-box (a remote notary, an append-only object
+**agent-shield makes no outbound network calls.** Its only socket use is a local `gethostname()` for the audit record; the built-in anchor shipper writes only to a local filesystem path. To anchor off-box (a remote notary, an append-only object
 store, another host), you **bring your own shipper** — a callable that receives the
 head and transmits it however *you* choose:
 
