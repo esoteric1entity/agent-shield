@@ -61,8 +61,12 @@ Hashing uses a deterministic, language-neutral form so the same logical entry
 hashes identically across runs and platforms:
 
 ```python
-json.dumps(entry, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+json.dumps(entry, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
 ```
+
+`allow_nan=False` makes a non-finite float in a write event's `details` raise
+rather than emit bare `NaN` / `Infinity` (which is not valid JSON and would
+break cross-implementation verification).
 
 `entry_hash` is computed over the entry with every field **except** `entry_hash`
 itself; the result is then stored as `entry_hash`. A verifier recomputes the same

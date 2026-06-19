@@ -15,6 +15,7 @@ License: Apache-2.0
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -75,6 +76,24 @@ def test_cli_md_report_survives_legacy_console_encoding(tmp_path, monkeypatch):
     out = buf.getvalue().decode("utf-8", errors="replace")
     assert rc == 0, f"clean (approved) target must exit 0; got {rc}"
     assert "APPROVED" in out, f"verdict missing from report: {out!r}"
+    # main() must NOT permanently mutate the caller's stdout encoding (footgun
+    # for an in-process embedder of main()).
+    assert sys.stdout.encoding == "cp850", "main() mutated the caller's stdout encoding"
+
+
+def test_empty_path_is_review(tmp_path):
+    """An empty path must NOT silently scan the current working directory."""
+    result = skill_vetting.vet_path("")
+    assert result.tier == "review"
+    assert "empty" in result.summary.lower()
+
+
+def test_existing_non_file_non_dir_target_is_review():
+    """A path that EXISTS but is neither a regular file nor a directory (a
+    device such as NUL / /dev/null) must not be silently approved."""
+    dev = "NUL" if os.name == "nt" else "/dev/null"
+    result = skill_vetting.vet_path(dev)
+    assert result.tier == "review"
 
 
 def test_doc_mentioning_dangerous_command_is_not_flagged_as_code(tmp_path):

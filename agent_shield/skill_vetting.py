@@ -312,10 +312,17 @@ def _tier_for(score: int) -> str:
 # =============================================================================
 def vet_path(path: str | Path) -> VetResult:
     """Statically vet a skill/tool path and return a VetResult. Read-only; never raises."""
+    if not str(path).strip():
+        # An empty path resolves to the CWD — never silently scan it.
+        return VetResult(0, "review", [], "empty path — nothing to vet")
     root = Path(path)
     if not root.exists():
         # Can't assess what isn't there — never silently approve.
         return VetResult(0, "review", [], "target not found — cannot vet")
+    if not root.is_file() and not root.is_dir():
+        # Exists but is a device / pipe / socket (e.g. NUL, /dev/null) — it
+        # cannot be scanned, so never silently approve.
+        return VetResult(0, "review", [], "target is not a regular file or directory — cannot vet")
 
     if root.is_file():
         files = [root]
@@ -369,17 +376,27 @@ def _render_md(result: VetResult) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _emit(text: str) -> None:
+    """Write the human report to stdout as UTF-8 without mutating the stream's
+    global encoding. This (a) lets the em-dash report survive a non-UTF-8/OEM
+    Windows console (cp850/cp437/cp932) — an unguarded write would raise
+    UnicodeEncodeError, get swallowed, and return a misleading exit 1 — and
+    (b) does NOT switch the caller's stdout encoding, so an in-process embedder
+    of main() keeps its own configuration. Never raises.
+    """
+    buf = getattr(sys.stdout, "buffer", None)
+    if buf is not None:
+        buf.write(text.encode("utf-8", "replace"))
+        buf.flush()
+    else:  # unusual wrapped stream without a binary buffer — best-effort
+        try:
+            sys.stdout.write(text)
+        except UnicodeEncodeError:
+            sys.stdout.write(text.encode("ascii", "replace").decode("ascii"))
+
+
 def main(argv: list[str] | None = None) -> int:
     import argparse
-
-    # Windows OEM consoles (cp850/cp437/cp932) cannot encode the report's
-    # em-dash glyph; an unguarded stdout write would raise UnicodeEncodeError,
-    # which the catch-all below would swallow and return a misleading exit 1 for
-    # a clean target. Reconfigure the streams to UTF-8 so both the human report
-    # and the documented exit-code contract survive any console codepage.
-    for _stream in (sys.stdout, sys.stderr):
-        if hasattr(_stream, "reconfigure"):
-            _stream.reconfigure(encoding="utf-8", errors="replace")
 
     parser = argparse.ArgumentParser(
         prog="agent_shield.skill_vetting",
@@ -393,7 +410,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.format == "json":
             sys.stdout.write(json.dumps(result.to_dict()))
         else:
-            sys.stdout.write(_render_md(result))
+            _emit(_render_md(result))
     except SystemExit:
         raise
     except Exception:  # noqa: BLE001 — vetter must never crash; can't-assess -> review
