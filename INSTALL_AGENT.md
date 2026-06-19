@@ -24,7 +24,7 @@ harness as PreToolUse hooks — which means editing their harness settings file;
 
 Probe (read-only) and report:
 
-1. **Python:** `python3 --version` / `python --version` — 3.12+ required (per `pyproject.toml`). Identify
+1. **Python:** `python3 --version` / `python --version` — 3.11+ required (per `pyproject.toml`). Identify
    the environment (venv? system? pipx available?). Prefer a venv or pipx;
    PEP 668-managed system Pythons will refuse a bare pip install.
 2. **Harness:** Claude Code (`~/.claude/` exists)? OpenClaw? Other? Hooks wiring

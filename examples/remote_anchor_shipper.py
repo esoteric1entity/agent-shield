@@ -15,7 +15,7 @@ counter, and a timestamp. No actor, target, command, file content, or `details`
 ever leaves the box. Read `docs/REMOTE_ANCHORING.md` for the risks (independent
 target, TLS, endpoint trust, SSRF, enterprise egress policy) before deploying.
 
-Stdlib only (`json`, `urllib`); Python >= 3.12. Apache-2.0.
+Stdlib only (`json`, `urllib`); Python >= 3.11. Apache-2.0.
 
 ---------------------------------------------------------------------------
 Usage (developer):

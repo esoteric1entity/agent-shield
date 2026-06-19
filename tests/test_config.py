@@ -411,7 +411,7 @@ def test_config_in_all():
 
 
 def test_tomllib_available_under_floor():       # H17
-    import tomllib       # noqa: F401 — must import cleanly on the >=3.12 floor
+    import tomllib       # noqa: F401 — must import cleanly on the >=3.11 floor
     assert hasattr(tomllib, "load")
 
 

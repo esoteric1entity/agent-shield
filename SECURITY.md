@@ -62,6 +62,22 @@ This shapes which reports we consider "security vulnerabilities" vs "usability o
 
 **Adversary assumption.** `agent-shield` assumes the **agent is the adversary** — misled by an adversarial prompt, an injected payload, or a confused-deputy attack via the harness. We do NOT assume the host or the user is the adversary; we assume the user is the authority and `agent-shield` is enforcing their pre-committed policy.
 
+## Disclosed vector: harness-tag spoofing (F-001, detected as of this release)
+
+On 2026-05-12, a class of injection was observed where attacker-controlled content
+attempted to spoof harness-level structural framing by forging tag boundaries
+(tags characteristic of agent harness context). This class of attack aims to make
+injected content appear to the model as if it originates from the harness itself,
+rather than from untrusted external input.
+
+**Status:** Detected as of this release — Layer 2 (`sanitize`) flags this class of
+harness-tag spoofing (F-001). Detection raises attacker cost and produces audit
+evidence; see the threat model note on the limits of detection vs. prevention.
+
+No specific bypass payload is published here. If you believe you have found a novel
+variant not covered by the current detection, please report it via the responsible
+disclosure process above (GitHub Security Advisory).
+
 ## Known limitations (v0.1.0 — alpha)
 
 `agent-shield` is **defense-in-depth, not an airtight guarantee.** It raises the cost of a dangerous action and makes tampering evident; it does not make either impossible. The API is **not yet stable** (`0.x`) — breaking changes may land between `0.x` releases, including to close a security gap. Maturity is also signalled by the PyPI `Development Status :: 3 - Alpha` classifier. Known, accepted limits in this release:

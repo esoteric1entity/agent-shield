@@ -54,7 +54,7 @@ _SOURCE_TAG = {"web": "web_content", "user": "user_input",
 #: pinned — phrasings are heuristic and churn, the kind taxonomy is stable).
 _STRIP_KINDS = ("zero_width", "bidi_override", "tag_char", "control", "surrogate")
 _MARKER_KINDS = ("ignore_previous", "fake_system_prefix", "role_override",
-                 "tool_call_mimicry", "wrapper_mimicry")
+                 "tool_call_mimicry", "wrapper_mimicry", "harness_tag_spoof")
 _ENCODING_KINDS = ("encoded_blob", "mixed_script")
 ALL_KINDS = _STRIP_KINDS + _MARKER_KINDS + _ENCODING_KINDS + ("oversize_unscanned",)
 
@@ -239,6 +239,8 @@ _MARKER_PATTERNS: list[tuple[str, re.Pattern]] = [
                 r"\"function\"\s*:\s*\{|\"arguments\"\s*:\s*\{|\"tool_call\")")),
     ("wrapper_mimicry",
      re.compile(r"(?i)<\s*/?\s*(?:web_content|user_input|agent_output|tool_output)\b")),
+    ("harness_tag_spoof",
+     re.compile(r"(?i)<\s*/?\s*(?:system-reminder|system|assistant|user|instructions)\b")),
 ]
 _MARKER_WHY = {
     "ignore_previous": "instruction-override phrasing ('ignore/disregard ... previous')",
@@ -246,6 +248,7 @@ _MARKER_WHY = {
     "role_override": "role/persona-override or jailbreak phrasing",
     "tool_call_mimicry": "content imitating a tool/function call",
     "wrapper_mimicry": "content embeds a reserved agent-shield wrapper tag name",
+    "harness_tag_spoof": "content forges a harness framing tag (system/assistant/user/instructions)",
 }
 
 # ----- encoding detection (DETECTION ONLY — never decoded)

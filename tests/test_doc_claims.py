@@ -123,3 +123,49 @@ def test_normalize_path_docstring_states_ascii_only_contract():
     doc = write_guard._normalize_path.__doc__ or ""
     assert "ASCII whitespace" in doc, "docstring must document the ASCII-only strip contract"
     assert "**NOT** stripped" in doc, "docstring must state non-ASCII whitespace (NBSP) is NOT stripped"
+
+
+# ---------------------------------------------------------------------------
+# G3 honesty-gate additions — README must claim EXACTLY what is true
+# ---------------------------------------------------------------------------
+
+def test_readme_has_known_gaps_table():
+    assert "## Known gaps" in README
+    assert "| Feature | Status | Target |" in README
+
+
+def test_readme_injection_claim_is_honest():
+    lowered = README.lower()
+    assert "does not prevent determined semantic injection" in lowered
+    assert "detects and flags" in lowered
+
+
+def test_readme_does_not_overclaim_prevent_injection():
+    lowered = README.lower()
+    assert "prevents prompt injection" not in lowered
+    assert "prevent prompt injection" not in lowered
+
+
+def test_readme_qualifies_deterministic():
+    assert "deterministic pattern-matching within its known pattern set" in README.lower()
+
+
+def test_readme_names_the_2026_05_12_vector():
+    assert "2026-05-12" in README
+    assert "harness" in README.lower() and "spoof" in README.lower()
+
+
+def test_readme_points_to_fetch_wrap_example():
+    assert "fetch-wrap.example.py" in README
+
+
+def test_readme_has_l6_trust_model_note():
+    lowered = README.lower()
+    assert "tamper-evident" in lowered and "tamper-proof" in lowered
+
+
+def test_readme_ci_matrix_states_3_11_floor():
+    # The CI matrix tests 3.11-3.14; the README prose describing it must not understate it.
+    lowered = README.lower()
+    assert "3.12–3.14" not in lowered and "3.12-3.14" not in lowered  # stale range gone
+    assert "3.11–3.14" in lowered or "3.11-3.14" in lowered           # corrected range present

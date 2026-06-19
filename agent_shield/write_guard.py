@@ -352,8 +352,9 @@ def main(argv: list[str] | None = None) -> int:
             # Don't trust a truncated parse — ask conservatively.
             result = GuardResult(decision="ask", reason="Hook input exceeds the size cap — confirm manually")
         else:
+            from .adapters import claude_code  # function-local: avoids import cycle
             path = _extract_path_from_hook_input(stdin_text)
-            result = check_path(path)
+            result = claude_code.decide({"tool_name": "Write", "tool_input": {"file_path": path}})
         hook_json = result.to_hook_json()
         if hook_json is not None:
             sys.stdout.write(json.dumps(hook_json))

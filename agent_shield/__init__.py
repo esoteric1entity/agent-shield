@@ -23,7 +23,7 @@ def _resolve_version() -> str:
     """
     try:
         from importlib.metadata import PackageNotFoundError, version
-    except ImportError:  # pragma: no cover - importlib.metadata is stdlib on 3.12
+    except ImportError:  # pragma: no cover - importlib.metadata is stdlib on 3.11
         return "0.1.0a4"
     try:
         return version("agent-shield")

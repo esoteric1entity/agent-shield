@@ -6,7 +6,7 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Status: alpha](https://img.shields.io/badge/Status-v0.1.0a4_alpha-yellow.svg)](#project-status)
-[![Python: ≥3.12](https://img.shields.io/badge/Python-%E2%89%A53.12-green.svg)](pyproject.toml)
+[![Python: ≥3.11](https://img.shields.io/badge/Python-%E2%89%A53.11-green.svg)](pyproject.toml)
 [![Tests](https://github.com/esoteric1entity/agent-shield/actions/workflows/test.yml/badge.svg)](https://github.com/esoteric1entity/agent-shield/actions/workflows/test.yml)
 
 ---
@@ -17,7 +17,7 @@
 
 v0.1.0 ships **six of the eight layers** — Layers 1, 2, 3, 4, 6, and 7 (see [The 8 layers](#the-8-layers) and [Project status](#project-status)):
 
-- **Layer 4 — Runtime Hooks** is the headline runtime surface, wired to Claude Code's PreToolUse hook contract:
+- **Layer 4 — Runtime Hooks** is the headline runtime surface. It runs on a **harness-agnostic architecture** (one neutral decision core, per-harness adapters) with two functional adapters shipping today: **Claude Code** (via PreToolUse hook; CI-verified) and **OpenClaw** (via `before_tool_call`; live but enforcement requires a recent gateway — see [`docs/adapter_status.md`](docs/adapter_status.md)). Additional harnesses (Codex, Gemini, Copilot, etc.) are roadmap.
   - **`bash_guard`** — inspects bash commands before execution
   - **`write_guard`** — inspects write / edit targets before they touch disk
 - **Layers 1, 2, 3, 6, 7** — `skill_vetting`, `sanitize`, `structured_output`, `audit`, and `config` — ship as importable library modules.
@@ -36,7 +36,7 @@ Layers 0 (operational/automation) and 5 (network egress) are in development.
 
 ## Quick start
 
-**Prerequisites:** Python 3.12+ (standard library only — zero runtime dependencies). On Windows, run the shell commands in Git Bash, WSL, or PowerShell (adapt as needed); the guards themselves are pure Python.
+**Prerequisites:** Python 3.11+ (standard library only — zero runtime dependencies). On Windows, run the shell commands in Git Bash, WSL, or PowerShell (adapt as needed); the guards themselves are pure Python.
 
 Install (pick your door):
 
@@ -168,7 +168,23 @@ python -m agent_shield.skill_vetting /path/to/some-skill --format json
 
 ## Layer 2 — Input Sanitization (shipping)
 
-`agent_shield.sanitize` sanitizes **untrusted incoming content** — web fetches, tool/MCP output, user input, agent-to-agent handoffs — before it reaches the model. It **strips** invisible/control characters (destructive, safe) and **detects-and-flags** injection markers and suspicious encodings (non-destructive by default). It **raises attacker cost** and surfaces suspicious content for the model/caller to judge — **it does not block or prevent prompt injection**; novel phrasings and encodings are unbounded.
+`agent_shield.sanitize` sanitizes **untrusted incoming content** — web fetches, tool/MCP output, user input, agent-to-agent handoffs — before it reaches the model. It **strips** invisible/control characters (destructive, safe) and **detects and flags** injection markers and suspicious encodings (non-destructive by default).
+
+Layer 2 (sanitize) **detects and flags** injection markers and encodings — including
+forged harness framing tags (`<system-reminder>`, `<system>`, `<assistant>`, `<user>`,
+`<instructions>`) as of this release. It **detects and flags** these — it does **not**
+block or intercept them at the model layer: novel phrasings and creative encodings are
+unbounded, and semantic injection at the model layer is outside what a guard can stop.
+agent-shield's defense is **detection**, **action-boundary prevention** (Layer 4 blocks
+dangerous outcomes), **cost-raising** (nonce wrappers), and **evidence** (Layer 6
+tamper-evident audit). It does not prevent determined semantic injection. For untrusted
+fetched content, see `examples/fetch-wrap.example.py`.
+
+> **Harness-tag spoofing class (F-001, detected as of this release):** On 2026-05-12 a
+> class of injection was observed where attacker-controlled content attempted to
+> harness spoof by forging structural framing tags to impersonate harness-level
+> context boundaries. Layer 2 now detects and flags this class. No working payload is
+> published here — see [`SECURITY.md`](SECURITY.md) for the disclosure posture.
 
 ```python
 from agent_shield import sanitize
@@ -255,6 +271,11 @@ The anchor periodically (every N entries or T minutes — never per-event) copie
 
 **agent-shield never phones home.** The shipped package makes **no outbound network calls** — its only socket use is a local `gethostname()` for the audit machine field, and the built-in anchor writes to a local path only. To anchor off-box, you **bring your own shipper** (a callable that transmits the receipt however you choose); the egress is your code and your policy. There is no `url`/`endpoint` parameter, and the no-network guarantee is checked by a best-effort AST lint in the test suite (not a sandbox). Your shipper runs **synchronously, in-process** and cannot be timed out in v0.1 — keep it fast, or do slow/network work asynchronously yourself. A ready-to-copy recipe and a full risk guide live in [`examples/remote_anchor_shipper.py`](examples/remote_anchor_shipper.py) and [`docs/REMOTE_ANCHORING.md`](docs/REMOTE_ANCHORING.md).
 
+The audit log is **tamper-evident, not tamper-proof**: a hash chain makes undetected
+edits hard, but a sufficiently privileged attacker can delete or rebuild the file. It
+is written `0600` and is a **forensic** record, not a live guard. Retention/rotation
+enforcement is not automated in this release.
+
 Full field reference, verification procedure, and limits: [`docs/AUDIT_SCHEMA.md`](docs/AUDIT_SCHEMA.md).
 
 ---
@@ -297,7 +318,7 @@ result: GuardResult = bash_guard.check_command("rm -rf /")
 
 Tiers map 1:1 to decisions — RED→`deny`, YELLOW→`ask`, GREEN→`allow`. The tier is the conceptual model; the API exposes `decision`.
 
-The package has **zero runtime dependencies**. Only the Python ≥3.12 standard library is required.
+The package has **zero runtime dependencies**. Only the Python ≥3.11 standard library is required.
 
 ---
 
@@ -330,7 +351,7 @@ bash tests/run_sh_tests.sh
 python tests/run_equivalence_test.py
 ```
 
-Four suites: Python guard/CLI tests, bash-subprocess equivalence, a bash-native harness, and a head-to-head equivalence runner. All must be green before a release is tagged; run them rather than trusting a number printed here. CI runs the full suite on Linux, macOS, and Windows (Python 3.12–3.14); platforms outside that matrix (e.g. BSD) aren't verified.
+Four suites: Python guard/CLI tests, bash-subprocess equivalence, a bash-native harness, and a head-to-head equivalence runner. All must be green before a release is tagged; run them rather than trusting a number printed here. CI runs the full suite on Linux, macOS, and Windows (Python 3.11–3.14); platforms outside that matrix (e.g. BSD) aren't verified.
 
 **Quality process.** agent-shield is AI-assisted by design — built with AI agents under human architectural direction — and engineered accordingly: changes are developed test-first (red → green) and must pass all four suites before a release is tagged. Releases additionally go through an independent adversarial review pass, with reviewers tasked to break the changes rather than approve them — for v0.1.0 that pass uncovered issues in early hardening attempts, which were corrected and re-verified before shipping. Platform note: the bash-subprocess pytest cases shell out to bash. On Windows the harness resolves Git-Bash/Cygwin explicitly and never the WSL `bash.exe` shim — Python's `subprocess` otherwise mis-resolves a bare `bash` to that shim (Win32 searches `System32` before `PATH`), and it hangs when driven from native-Windows Python. So the parity cases now run on Windows too; if no usable bash is found they skip with a clear reason instead of hanging. Set `AGENT_SHIELD_TEST_BASH` to a specific `bash.exe` to override resolution.
 
@@ -364,16 +385,16 @@ The shield is **defense-in-depth, not defense-as-perimeter.** Even with all 8 la
 
 ## Bypasses and limitations
 
-Layer 4 is a **best-effort regex layer, not a sandbox.** It raises the cost of accidental and naive-adversarial damage; it does not make damage impossible. Be honest with yourself about what that buys you:
+Layer 4 is a **best-effort regex layer, not a sandbox.** It performs deterministic pattern-matching within its known pattern set; it raises the cost of accidental and naive-adversarial damage, but it does not make damage impossible. Be honest with yourself about what that buys you:
 
 **Known evadable forms** (deliberately out of scope for pattern matching):
 
-- **Variable indirection** — `X="rm -rf /"; $X` builds the command at runtime; no static pattern sees it assembled.
-- **Interpreter hop** — `python -c "import shutil; shutil.rmtree('/')"`, `perl -e`, `node -e`: the destructive call lives inside another language.
-- **Fetch-then-execute in separate steps** — download to a file in one command, `bash file` in the next. Each step looks individually mundane.
-- **Aliases and functions** — `alias safe=rm; safe -rf /` defines the evasion before using it.
+- **Variable indirection** — assembling the command string at runtime from pieces, so no static pattern ever sees it whole.
+- **Interpreter hop** — wrapping the destructive call inside another language's inline-eval flag (`python -c`, `perl -e`, `node -e`), where the regex never sees it.
+- **Fetch-then-execute in separate steps** — download to a file in one command, then execute it in the next. Each step looks individually mundane.
+- **Aliases and functions** — defining an alias or shell function for a destructive verb, then invoking the harmless-looking name.
 - **Novel encodings** — we catch `base64 -d | sh` and `openssl enc -d | sh`; arbitrarily creative encode/decode chains are unbounded.
-- **Separator/word-split spellings and capability-equivalent verbs** — `rm${IFS}-rf${IFS}/` substitutes the literal spaces the patterns key on, and destructive verbs outside the matched set (e.g. `find … -delete`, `truncate … /dev/…`) are not pattern-matched. These need OS-level sandboxing, not regex.
+- **Separator/word-split spellings and capability-equivalent verbs** — substituting the literal whitespace the patterns key on (shell field-separator / word-splitting tricks), or reaching the same destructive effect through utilities outside the matched verb set. These need OS-level sandboxing, not regex.
 
 **Behavioral limitations** (by design, documented so you can plan around them):
 
@@ -386,11 +407,30 @@ If your threat model requires *guarantees* against a determined adversarial agen
 
 ---
 
+## Known gaps
+
+agent-shield is honest about scope. Deterministic pattern-matching within its known
+pattern set; it is not a sandbox and does not prevent semantic prompt injection.
+
+| Feature | Status | Target |
+|---|---|---|
+| L0 operational automation (retention/rotation enforcement) | Not built | Roadmap |
+| L5 network egress control (allowlist/proxy) | Not built | Demand-gated |
+| Stateful multi-step correlation (recon→exfil, persistence) | Not built | Next release |
+| Python AST / dataflow malware analysis (L1) | Not built (regex-only) | Demand-gated |
+| JavaScript AST analysis | Not built (pair with `npm audit`) | Demand-gated |
+| Transitive CVE scanning | Won't do (breaks offline promise) | — |
+| harness_tag_spoof flags literal `<system>`/`<user>` in benign markup | By design (flag-only default; strict neutralizes) | — |
+| OpenClaw enforcement on old gateways | Gateway-gated | Now (recent gateway) |
+| Additional harnesses (Codex/Gemini/Copilot/OpenCode) | Not built | Demand-gated |
+
+---
+
 ## Why you can trust this
 
 agent-shield is a security tool from an independent author — so it's built to be **verified, not taken on faith**:
 
-- **Auditable by design.** Zero runtime dependencies — Python ≥3.12 standard library only. The guards are a handful of readable modules, with an inline threat-model comment on every pattern; you can read the whole enforcement surface before you trust it.
+- **Auditable by design.** Zero runtime dependencies — Python ≥3.11 standard library only. The guards are a handful of readable modules, with an inline threat-model comment on every pattern; you can read the whole enforcement surface before you trust it.
 - **It never phones home.** The shipped package makes **no outbound network calls** — its only socket use is a local `gethostname()` for the audit record. The optional audit anchor writes to a local path only; to send anything off-box you supply your own shipper (your code, your policy). The no-egress property is checked by a best-effort AST lint in the test suite.
 - **Test-first, then adversarially reviewed.** Changes are developed red→green; every release additionally goes through an independent review pass tasked with *breaking* the change rather than approving it. The full test suite — guard logic, CLI/hook contract, security regressions, doc-claims, and Python↔bash decision-equivalence — must be green before any release is tagged, and the pattern counts quoted in this README are themselves test-asserted, so code and docs can't drift.
 - **It protects itself.** Writes to its own guard modules and to your hook / permission config are blocked, so an agent under the shield can't quietly disable it.
@@ -402,12 +442,12 @@ agent-shield is a security tool from an independent author — so it's built to 
 
 ## Project status
 
-**v0.1.0 alpha** — Layers 1, 2, 3, 4, 6, and 7 ship. Layers 0 and 5 are in active development.
+**v0.1.0 alpha** — Layers 1, 2, 3, 4, 6, and 7 ship. Layers 0 and 5 are in active development. **Python 3.11+** (LTS); tomllib stdlib → zero external deps. Layer 4 runs on a harness-agnostic architecture: one neutral decision core with two functional adapters today — Claude Code (CI-verified) and OpenClaw (live; enforcement requires a recent gateway — see [`docs/adapter_status.md`](docs/adapter_status.md)). Additional harnesses are roadmap.
 
 | Item | Status |
 |---|---|
 | Layer 1 (skill / tool vetting) | ✅ Shipped — static scanner + 3-tier verdict |
-| Layer 4 (runtime hooks) | ✅ Shipped — bash_guard + write_guard |
+| Layer 4 (runtime hooks) | ✅ Shipped — bash_guard + write_guard; Claude Code **and** OpenClaw adapters |
 | Layer 0 (cron rotation) | 🟡 templates drafted |
 | Layer 2 (input sanitization) | ✅ Shipped — strip + flag + nonce-wrap (detection/flagging, not a prompt-injection blocker) |
 | Layer 3 (structured output) | ✅ Shipped — stdlib schema validator + JSON-discipline helpers (shape, not intent) |

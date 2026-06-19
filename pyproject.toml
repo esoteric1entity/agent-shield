@@ -7,7 +7,7 @@ name = "agent-shield"
 version = "0.1.0a4"
 description = "Defensive overlay for AI agents — 8-layer architecture; v0.1.0 ships 6 layers (1 skill_vetting, 2 sanitize, 3 structured_output, 4 bash_guard+write_guard, 6 audit, 7 config)"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 license = "Apache-2.0"
 authors = [
     { name = "esoteric1entity" },
@@ -18,6 +18,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
@@ -36,6 +37,7 @@ dev = [
 agent-shield-bash-guard = "agent_shield.bash_guard:main"
 agent-shield-write-guard = "agent_shield.write_guard:main"
 agent-shield-vet = "agent_shield.skill_vetting:main"
+agent-shield-openclaw-guard = "agent_shield.adapters.openclaw:main"
 
 [project.urls]
 Homepage = "https://github.com/esoteric1entity/agent-shield"

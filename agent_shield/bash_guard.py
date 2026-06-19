@@ -463,8 +463,9 @@ def main(argv: list[str] | None = None) -> int:
             # Don't trust a truncated parse — ask conservatively.
             result = GuardResult(decision="ask", reason="Hook input exceeds the size cap — confirm manually")
         else:
+            from .adapters import claude_code  # function-local: avoids import cycle
             cmd = _extract_command_from_hook_input(stdin_text)
-            result = check_command(cmd)
+            result = claude_code.decide({"tool_name": "Bash", "tool_input": {"command": cmd}})
         hook_json = result.to_hook_json()
         if hook_json is not None:
             # Default json.dumps (ensure_ascii=True) keeps the output ASCII-safe

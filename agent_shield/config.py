@@ -27,7 +27,7 @@ Hard guarantees:
     cannot remove or relax a built-in guard pattern (no pattern-injection keys
     ship in v0.1). The config file itself is a ``write_guard`` YELLOW candidate.
 
-Stdlib-only; ``tomllib`` is unconditionally available on the package's >=3.12
+Stdlib-only; ``tomllib`` is unconditionally available on the package's >=3.11
 floor (read-only — users edit the file, we only read it, in BINARY mode).
 
 Author: esoteric1entity, AI-Assisted

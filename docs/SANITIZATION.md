@@ -57,6 +57,7 @@ stable).
 | content | `role_override` | role/persona-override or jailbreak phrasing |
 | content | `tool_call_mimicry` | content imitating a tool/function call |
 | content | `wrapper_mimicry` | content embeds a reserved wrapper tag name |
+| content | `harness_tag_spoof` | content forges a harness framing tag (`<system-reminder>`, `<system>`, `<assistant>`, `<user>`, `<instructions>`) — the prompt-injection class where fetched or untrusted content mimics the agent's own structural framing. Detected and flagged; neutralized under strict mode. Distinct from `wrapper_mimicry`, which covers agent-shield's own wrapper tags. |
 | encoding | `encoded_blob` | long base64/base64url-shaped blob (never decoded) |
 | encoding | `mixed_script` | token mixes Latin with Cyrillic/Greek (possible homoglyph) |
 | content | `oversize_unscanned` | input exceeded the deep-scan cap; marker/encoding scan skipped |
