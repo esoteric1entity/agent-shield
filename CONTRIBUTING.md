@@ -1,5 +1,7 @@
 # Contributing to Agent Architect Stack
 
+> **Scope:** agent-shield is the security component of the Agent Architect Stack umbrella, and this repository is its standalone home. The conventions below are shared across the stack, so a few references (branches, sibling components such as memory) describe the broader umbrella — they all apply to contributing to agent-shield.
+
 Thank you for your interest in contributing. This document covers the **how** of contributing. The **why** is captured in the project's [README](./README.md) and the per-branch documentation.
 
 ## Quick links

@@ -40,7 +40,7 @@ Hardening from an independent adversarial review: cases the suite had not previo
 - **L2 `sanitize` — bounded NFKC.** NFKC now runs in combining-safe chunks with a cumulative-output budget and a pathological-expansion circuit breaker, so a compatibility expander no longer stalls the sanitizer; benign input of any length is still fully normalized, and the NFKC and scan budgets are aligned so there is no partial-fold evasion gap.
 - **L6 `audit` — anchoring honesty.** Documented the unanchored-tail blind spot (periodic anchoring leaves the window since the last anchor forgeable) with a regression test pinning that `verify()` is tamper-*evident*, not tamper-resistant. Corrected the "imports no networking library" claim — the package imports `socket` only for `gethostname()` and makes no outbound calls.
 - **Privacy.** Test docstrings anonymized.
-- **Docs.** README intro states the six shipping layers; `pyproject` / `__init__` descriptions aligned; version coherence to `0.1.0a4`; the issue template no longer references the withdrawn `0.1.0a2`.
+- **Docs.** README intro states the six shipping layers; `pyproject` / `__init__` descriptions aligned; version coherence to `0.1.0a4`.
 
 ### Layer 7 — Configuration (added 2026-06-15)
 - **`agent_shield/config.py`** — the cross-layer configuration spine + shared compliance contract. `config.load(path=None, *, compliance=…, audit_path=…, sanitize_strict=…, structured_output_mode=…) → Config`, plus frozen `Config` / `AuditConfig` / `SanitizeConfig` / `StructuredOutputConfig` / `GuardConfig` (each with `to_dict()`) and `config.preset_names()`. Stdlib-only, zero runtime dependencies.

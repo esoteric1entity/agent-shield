@@ -360,6 +360,7 @@ Four suites: Python guard/CLI tests, bash-subprocess equivalence, a bash-native 
 ## Troubleshooting
 
 - **`ModuleNotFoundError: No module named 'agent_shield'`** — the hook/CLI is running under a different Python than the one agent-shield is installed in. Activate the right venv, or point the hook at that interpreter (e.g. `/path/to/venv/bin/python -m agent_shield.bash_guard`).
+- **`ModuleNotFoundError: No module named 'agent_shield'` *after uninstalling*** — `pip uninstall` removed the package, but the two `PreToolUse` hook entries are still in your `settings.json`, so every tool call now fails. Remove the agent-shield `Bash` and `Write|Edit|MultiEdit` entries from `~/.claude/settings.json` (or the project `.claude/settings.json`) and restart. Full steps: [`INSTALL_AGENT.md`](INSTALL_AGENT.md) Step 6.
 - **A safe command produces no output** — that's correct: `allow` is a silent pass (empty stdout, exit 0). Test with a known-bad command (`echo '{"tool_input":{"command":"rm -rf /"}}' | python -m agent_shield.bash_guard`) to see a `deny`.
 - **Hooks don't take effect in Claude Code** — restart the session after editing `settings.json`; hooks are read at startup.
 - **Windows: the bash-parity tests are slow or skip** — the suite resolves Git-Bash/Cygwin explicitly (never the WSL `bash.exe` shim) and skips cleanly if no POSIX bash is found; set `AGENT_SHIELD_TEST_BASH` to a specific `bash.exe` to override. The runtime guards are pure Python and need no bash.

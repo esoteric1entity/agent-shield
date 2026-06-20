@@ -23,6 +23,16 @@ def test_decide_path_from_derived_paths():
     assert openclaw.decide(event).decision == "deny"
 
 
+def test_extract_non_dict_params_does_not_raise():
+    # "params" is truthy but not a dict — _extract must fail open, not raise.
+    assert openclaw._extract({"params": "not-a-dict"}) == (None, None)
+    assert openclaw._extract({"params": ["x"]}) == (None, None)
+
+
+def test_decide_non_dict_params_allows():
+    assert openclaw.decide({"toolName": "Bash", "params": "x"}).decision == "allow"
+
+
 def test_format_deny_is_terminal_block():
     resp = openclaw.format_response(GuardResult("deny", "destructive command"))
     assert resp == {"block": True, "blockReason": "destructive command"}

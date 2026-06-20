@@ -96,6 +96,28 @@ Then summarize honestly: environment, version confirmed, hooks wired or not, smo
 results, and the restart reminder. Point the user at `SECURITY.md` (what the guards
 do and do not protect against) and `examples/before-after.md`.
 
+## Step 6 — Uninstall (consent required)
+
+Uninstalling is **two actions**, not one. `pip uninstall` removes the package, but it
+does **not** touch the harness settings — and a `PreToolUse` hook that points at a
+now-removed guard makes **every** tool call fail with
+`ModuleNotFoundError: No module named 'agent_shield'` on the next session. Always do both,
+in order:
+
+1. **Remove the package:** `pip uninstall -y agent-shield` (in the environment it was
+   installed into). Confirm with `pip show agent-shield` → no output.
+2. **Un-wire the hooks (only if you wired them in Step 3).** Read the settings file
+   (`~/.claude/settings.json`, or the project `.claude/settings.json`) and **remove the two
+   `PreToolUse` entries** agent-shield added — the `Bash` → `python -m agent_shield.bash_guard`
+   entry and the `Write|Edit|MultiEdit` → `python -m agent_shield.write_guard` entry.
+   **Show the user the before/after diff and get consent before writing.** Remove **only**
+   those two entries; never touch unrelated hooks. If `hooks.PreToolUse` is left empty, an
+   empty array or removing the key are both valid.
+3. **Restart** the harness session so it reloads settings without the hooks.
+
+Skipping step 2 leaves stale hook references that break all `Bash`/`Write`/`Edit` operations
+until they are removed — see the **Troubleshooting** entry in `README.md`.
+
 ---
 
 *Cross-references: `README.md` (quick start + API) · `SECURITY.md` (threat model +

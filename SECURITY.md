@@ -92,6 +92,15 @@ disclosure process above (GitHub Security Advisory).
 
 These are disclosed so the protection is neither over- nor under-claimed; see the linked layer docs for the per-layer detail.
 
+## Uninstalling (remove the hooks, too)
+
+`pip uninstall agent-shield` removes the package but **not** the harness hook wiring. If
+you wired the guards into a `PreToolUse` hook, you must also remove those two entries from
+your `settings.json` (the `Bash` → `agent_shield.bash_guard` and `Write|Edit|MultiEdit` →
+`agent_shield.write_guard` entries) and restart the harness. A hook that points at a removed
+guard makes every tool call fail with `ModuleNotFoundError` until the entry is cleared — see
+`INSTALL_AGENT.md` Step 6 for the exact procedure.
+
 ## Coordinated disclosure principles
 
 - We will not publicly disclose a vulnerability before a fix is available, unless: (a) the issue is already being exploited in the wild, or (b) the reporter requests immediate disclosure and we've assessed it is appropriate.

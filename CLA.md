@@ -1,6 +1,7 @@
 # Contributor License Agreement (CLA)
 
-The Agent Architect Stack project uses a CLA (Contributor License Agreement) to
+The Agent Architect Stack project — of which agent-shield is the security
+component — uses a CLA (Contributor License Agreement) to
 ensure that contributions can be incorporated into the project under the project's
 license AND that the project retains the option to consider future license changes
 with proper contributor consent.

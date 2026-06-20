@@ -88,6 +88,12 @@ def test_empty_path_is_review(tmp_path):
     assert "empty" in result.summary.lower()
 
 
+def test_none_path_is_review():
+    """A None path must be handled like an empty path — review, never raise."""
+    result = skill_vetting.vet_path(None)
+    assert result.tier == "review"
+
+
 def test_existing_non_file_non_dir_target_is_review():
     """A path that EXISTS but is neither a regular file nor a directory (a
     device such as NUL / /dev/null) must not be silently approved."""

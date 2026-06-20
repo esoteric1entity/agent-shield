@@ -17,6 +17,12 @@ gives credit where credit is due, in three categories:
 numbers"): architectural patterns and design choices are transferable;
 specific performance claims and benchmarks are situational and not borrowed.
 
+> **Note — scope:** this file credits the inspirations of the broader **Agent
+> Architect Stack** umbrella, from which agent-shield emerged as the security
+> component. Accordingly, the version `v3.6.0` referenced below is the
+> *umbrella's* version (not an agent-shield version), and the `release/<name>/`
+> path describes the umbrella's internal repository layout.
+
 ---
 
 ## 1. Upstream open-source projects (with full citations)

@@ -28,6 +28,8 @@ _PATH_KEYS = ("file_path", "path", "filePath")
 def _extract(event: dict) -> tuple[str | None, str | None]:
     """Return (command, path) — at most one is non-None. Best-effort, never raises."""
     params = (event or {}).get("params") or {}
+    if not isinstance(params, dict):
+        params = {}
     cmd = params.get("command")
     if isinstance(cmd, str):
         return cmd, None

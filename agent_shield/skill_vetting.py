@@ -312,7 +312,7 @@ def _tier_for(score: int) -> str:
 # =============================================================================
 def vet_path(path: str | Path) -> VetResult:
     """Statically vet a skill/tool path and return a VetResult. Read-only; never raises."""
-    if not str(path).strip():
+    if path is None or not str(path).strip():
         # An empty path resolves to the CWD — never silently scan it.
         return VetResult(0, "review", [], "empty path — nothing to vet")
     root = Path(path)

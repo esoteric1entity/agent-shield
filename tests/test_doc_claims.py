@@ -28,6 +28,12 @@ from agent_shield import bash_guard, write_guard
 
 README = (Path(__file__).resolve().parent.parent / "README.md").read_text(encoding="utf-8")
 
+_ROOT = Path(__file__).resolve().parent.parent
+INSTALL_AGENT = (_ROOT / "INSTALL_AGENT.md").read_text(encoding="utf-8")
+SECURITY = (_ROOT / "SECURITY.md").read_text(encoding="utf-8")
+EXAMPLES_README = (_ROOT / "examples" / "README.md").read_text(encoding="utf-8")
+ADAPTER_STATUS = (_ROOT / "docs" / "adapter_status.md").read_text(encoding="utf-8")
+
 
 def _claimed_counts(section_marker: str) -> dict[str, int]:
     """Parse '**N RED patterns**' / '**N YELLOW patterns**' from a README section."""
@@ -169,3 +175,44 @@ def test_readme_ci_matrix_states_3_11_floor():
     lowered = README.lower()
     assert "3.12–3.14" not in lowered and "3.12-3.14" not in lowered  # stale range gone
     assert "3.11–3.14" in lowered or "3.11-3.14" in lowered           # corrected range present
+
+
+# ---------------------------------------------------------------------------
+# Pre-flip audit pins — B1 uninstall guidance + B2/H1 adapter_status hygiene
+# ---------------------------------------------------------------------------
+
+def test_install_agent_documents_uninstall():
+    lowered = INSTALL_AGENT.lower()
+    assert "uninstall" in lowered, "INSTALL_AGENT.md must document uninstall"
+    assert "pip uninstall" in lowered
+    assert "settings.json" in lowered  # must cover removing the hook wiring, not just pip uninstall
+    assert "pretooluse" in lowered or "hook" in lowered
+
+
+def test_readme_documents_post_uninstall_hook_cleanup():
+    lowered = README.lower()
+    assert "uninstall" in lowered and "settings.json" in lowered
+
+
+def test_security_documents_uninstall_hook_cleanup():
+    lowered = SECURITY.lower()
+    assert "uninstall" in lowered and "settings.json" in lowered
+
+
+def test_examples_readme_documents_uninstall():
+    assert "uninstall" in EXAMPLES_README.lower()
+
+
+def test_shipped_docs_have_no_enforcement_test_scratch_leak():
+    """No shipped doc may reference the internal scratch/enforcement-test path."""
+    root = Path(__file__).resolve().parent.parent
+    docs = [root / "README.md", root / "SECURITY.md", root / "INSTALL_AGENT.md", root / "examples" / "README.md"]
+    docs += sorted((root / "docs").glob("*.md"))
+    for d in docs:
+        assert "scratch/enforcement-test" not in d.read_text(encoding="utf-8"), (
+            f"{d.name} leaks an internal scratch/ path"
+        )
+
+
+def test_adapter_status_documents_openclaw_guard_entry_point():
+    assert "agent-shield-openclaw-guard" in ADAPTER_STATUS

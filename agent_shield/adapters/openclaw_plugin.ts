@@ -21,7 +21,7 @@ export const hooks = {
       const proc = spawnSync("agent-shield-openclaw-guard", [], {
         input: JSON.stringify(event),
         encoding: "utf-8",
-        timeout: 5000,
+        timeout: 5000, // 5000ms (5s) — Node spawnSync expects milliseconds
       });
       if (proc.status !== 0 || !proc.stdout) {
         return {}; // fail-open (allow) — same posture as the CC adapter
