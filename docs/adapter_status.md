@@ -15,6 +15,10 @@ console script — a `before_tool_call` event JSON in on stdin, a `BeforeToolCal
 out, which is what the TypeScript companion plugin (`openclaw_plugin.ts`) spawns — or as a
 module: `python -m agent_shield.adapters.openclaw`.
 
+**All console scripts.** The package installs four: `agent-shield-bash-guard`, `agent-shield-write-guard`, `agent-shield-vet`, and `agent-shield-openclaw-guard` — for harness hooks and direct CLI use.
+
+**Where the plugin lives after install.** The TypeScript companion plugin ships inside the installed package at `<site-packages>/agent_shield/adapters/openclaw_plugin.ts`. Locate it with: `python -c "import agent_shield, pathlib; print(pathlib.Path(agent_shield.__file__).parent / 'adapters' / 'openclaw_plugin.ts')"`.
+
 **Minimum OpenClaw gateway version — pending live verification.** The concrete minimum will
 be published here once agent-shield's `before_tool_call` block has been confirmed *honored*
 against a live OpenClaw gateway. Until then, treat OpenClaw enforcement as *requires a recent,

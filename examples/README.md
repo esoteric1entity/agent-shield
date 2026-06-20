@@ -56,11 +56,14 @@ cp ~/.claude/settings.json ~/.claude/settings.json.bak
 # 3. Restart Claude Code so it reloads settings without the hooks
 ```
 
+**For OpenClaw and other harnesses:** the same principle applies — remove the guard's hook entry from that harness's configuration and restart the session. The exact mechanism is harness-specific (see your harness's settings docs); the unwire-then-restart pattern is the same.
+
 ## What's NOT in examples
 
-- **Configuration of pattern lists** — patterns are hardcoded in `agent_shield/{bash,write}_guard.py` for v0.1. A future release will add `agent_shield/patterns.toml` for user-extensible rules. Until then, fork the package to add custom patterns.
+- **Configuration of Layer 4 pattern lists** — the `bash_guard`/`write_guard` pattern lists are hardcoded for v0.1; user-extensible rules are roadmap for v0.2 (until then, fork to add patterns). Layer 2 (`sanitize`) and Layer 7 (`config`) *are* configurable today — strict mode, compliance presets, and environment overrides; see [`../docs/CONFIGURATION.md`](../docs/CONFIGURATION.md).
 - **Custom audit-log destinations** — the hook output is what Claude Code logs; routing the JSON elsewhere is a layer-6 concern (not yet shipping).
 - **Cross-machine policy sync** — a single agent-shield install protects one host. Cross-host policy is out of scope.
+- **Harness-adapter integration patterns** — Layer 4 ships adapters for Claude Code (PreToolUse, shown in `claude-code-settings.example.json`) and OpenClaw (`before_tool_call`); deeper per-harness wiring examples and additional harnesses are roadmap for v0.2. See [`../docs/adapter_status.md`](../docs/adapter_status.md).
 
 ---
 

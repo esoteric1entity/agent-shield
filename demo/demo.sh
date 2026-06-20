@@ -7,8 +7,8 @@
 #   * allow a safe one              (allow — silent, exit 0)
 #
 # Usage:    bash demo/demo.sh
-# Requires: agent-shield installed (`pip install agent-shield`, or, from a repo
-#           checkout, `pip install -e .`). Pure Python; no other dependencies.
+# Requires: agent-shield installed (`pip install git+https://github.com/esoteric1entity/agent-shield.git`,
+#           or, from a repo checkout, `pip install -e .`). Pure Python; no other dependencies.
 # Override the interpreter with the PYTHON env var if needed.
 #
 # Recording the GIF / asciinema for the README: see demo/README.md.
@@ -28,7 +28,7 @@ fi
 
 if ! "${PY}" -c "import agent_shield" >/dev/null 2>&1; then
   echo "error: agent-shield is not importable under '${PY}'." >&2
-  echo "       install it first:  ${PY} -m pip install agent-shield" >&2
+  echo "       install it first:  ${PY} -m pip install git+https://github.com/esoteric1entity/agent-shield.git" >&2
   exit 1
 fi
 

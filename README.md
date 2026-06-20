@@ -20,7 +20,7 @@ v0.1.0 ships **six of the eight layers** — Layers 1, 2, 3, 4, 6, and 7 (see [T
 - **Layer 4 — Runtime Hooks** is the headline runtime surface. It runs on a **harness-agnostic architecture** (one neutral decision core, per-harness adapters) with two functional adapters shipping today: **Claude Code** (via PreToolUse hook; CI-verified) and **OpenClaw** (via `before_tool_call`; live but enforcement requires a recent gateway — see [`docs/adapter_status.md`](docs/adapter_status.md)). Additional harnesses (Codex, Gemini, Copilot, etc.) are roadmap.
   - **`bash_guard`** — inspects bash commands before execution
   - **`write_guard`** — inspects write / edit targets before they touch disk
-- **Layers 1, 2, 3, 6, 7** — `skill_vetting`, `sanitize`, `structured_output`, `audit`, and `config` — ship as importable library modules.
+- **Layers 1, 2, 3, 6, 7** — `skill_vetting`, `sanitize` (incl. F-001 harness-tag-spoofing detection), `structured_output`, `audit`, and `config` — ship as importable library modules.
 
 Layers 0 (operational/automation) and 5 (network egress) are in development.
 
@@ -93,6 +93,8 @@ Wire it into `~/.claude/settings.json` (the **module form** below — `python -m
 }
 ```
 
+**Use it with OpenClaw (or another harness):** the same neutral decision core backs every harness. Wire the OpenClaw `before_tool_call` hook to the `agent-shield-openclaw-guard` console script (or `python -m agent_shield.adapters.openclaw`) — it reads the tool event as JSON on stdin and returns the block / ask / allow decision. See [`docs/adapter_status.md`](docs/adapter_status.md) for the adapter contract and gateway requirement. The library API (`bash_guard.check_command()`, `write_guard.check_path()`) is identical across harnesses.
+
 ---
 
 ## The 8 layers
@@ -160,6 +162,7 @@ r.findings  # list of Finding(category, severity, file, line, snippet, why)
 ```bash
 python -m agent_shield.skill_vetting /path/to/some-skill            # exit 0/1/2 = approved/review/rejected
 python -m agent_shield.skill_vetting /path/to/some-skill --format json
+# the installed console script works too:  agent-shield-vet /path/to/some-skill
 ```
 
 **Threat categories** (code files scanned line-by-line; instruction files scanned for injection; dependency manifests checked for typosquats): `ENV_BULK`, `ENV_SCRAPE`, `CRED_PATH`, `FS_DANGER`, `PIPE_TO_SHELL`, `PERSIST`, `NET_EXFIL`, `CRYPTO_MINE`, `PROMPT_INJECTION`, `TYPOSQUAT`. The category list is verified by automated tests — drift between code and docs is detected at release time. This is a static heuristic gate, not a sandbox — see [Bypasses and limitations](#bypasses-and-limitations).

@@ -22,7 +22,15 @@ Triaged as polish rather than blockers; deferred so each gets its own design and
 - **Packaging** — a PEP-562 module `__getattr__` so `agent_shield.bash_guard` resolves after a bare `import agent_shield` while keeping the no-eager-import property.
 - **L1 `skill_vetting` walker DoS hardening** — bound symlink / junction traversal to the target tree and add an aggregate file-count / total-byte budget so a hostile package can't soft-DoS the scan. (The vetter is a deliberately-invoked CLI, not an automated input path, so this is bounded-priority — it warrants its own design + test pass rather than a pre-flip change.)
 
-## [0.1.0a4] — 2026-06-17 — readiness-hardening alpha
+## [0.1.0a4] — 2026-06-19 — readiness-hardening alpha + Release A
+
+### Release A — harness-agnostic adapters, F-001, F-008, Python 3.11 floor
+- **Harness-agnostic Layer 4 adapters.** Runtime hooks now run on a neutral decision core with thin per-harness adapters: **Claude Code** (`PreToolUse`, CI-verified) and **OpenClaw** (`before_tool_call`, gateway-gated) ship today, with a cross-adapter decision-equivalence test. Adapter status + the additional-harness roadmap: `docs/adapter_status.md`.
+- **F-001 — harness-tag spoofing detection (Layer 2).** `sanitize` now detects and flags forged harness-framing tags (`<system-reminder>`, `<system>`, `<assistant>`, `<user>`, `<instructions>`). Detection and evidence, not prevention — see `SECURITY.md`.
+- **F-008 — fetch-wrap example.** `examples/fetch-wrap.example.py` shows the Layer 2 nonce-delimited wrapper for untrusted fetched content.
+- **Python 3.11 floor.** `requires-python = ">=3.11"` (keeps `tomllib` in the standard library, zero runtime deps); the CI matrix runs Python 3.11–3.14.
+- **Honest scope.** README known-gaps table + bounded language (Layer 2 *detects and flags*, it does not *prevent* injection; "deterministic pattern-matching within its known pattern set"); OpenClaw enforcement is scoped to "requires a recent gateway — pending live verification."
+- **Complete uninstall path.** Uninstalling also removes the `PreToolUse` hook entries from `settings.json` (INSTALL_AGENT.md Step 6, with notes in README, SECURITY.md, and `examples/`), pinned by a regression test.
 
 ### Security & readiness hardening
 Hardening from an independent adversarial review: cases the suite had not previously exercised were found and closed, each test-first, with the two Layer-4 ports kept decision-equivalent.
@@ -41,6 +49,7 @@ Hardening from an independent adversarial review: cases the suite had not previo
 - **L6 `audit` — anchoring honesty.** Documented the unanchored-tail blind spot (periodic anchoring leaves the window since the last anchor forgeable) with a regression test pinning that `verify()` is tamper-*evident*, not tamper-resistant. Corrected the "imports no networking library" claim — the package imports `socket` only for `gethostname()` and makes no outbound calls.
 - **Privacy.** Test docstrings anonymized.
 - **Docs.** README intro states the six shipping layers; `pyproject` / `__init__` descriptions aligned; version coherence to `0.1.0a4`.
+- **Docs — uninstall path.** Uninstalling is two steps, not one: `pip uninstall` must be paired with removing the two `PreToolUse` hook entries from `settings.json` (documented in INSTALL_AGENT.md Step 6, with matching notes in README, SECURITY.md, and `examples/`). A hook left pointing at the removed guard otherwise breaks the harness with `ModuleNotFoundError` on the next session.
 
 ### Layer 7 — Configuration (added 2026-06-15)
 - **`agent_shield/config.py`** — the cross-layer configuration spine + shared compliance contract. `config.load(path=None, *, compliance=…, audit_path=…, sanitize_strict=…, structured_output_mode=…) → Config`, plus frozen `Config` / `AuditConfig` / `SanitizeConfig` / `StructuredOutputConfig` / `GuardConfig` (each with `to_dict()`) and `config.preset_names()`. Stdlib-only, zero runtime dependencies.
@@ -134,7 +143,7 @@ The pre-publish alpha of the Python port. No functional changes vs the prior art
 - `agent_shield/write_guard.py` — RED + YELLOW pattern tiers with a GREEN default.
 - `agent_shield/_result.py` — `GuardResult` dataclass with `to_hook_json()` for Claude Code PreToolUse compatibility.
 - CLI entries: `agent-shield-bash-guard` + `agent-shield-write-guard`.
-- Zero runtime dependencies; Python ≥ 3.12 required.
+- Zero runtime dependencies; Python ≥ 3.12 required *(the floor for this pre-release; lowered to ≥ 3.11 in 0.1.0a4 — see the top entry)*.
 
 ---
 

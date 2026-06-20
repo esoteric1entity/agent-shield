@@ -142,6 +142,10 @@ Contributors are listed in [`AUTHORS.md`](./AUTHORS.md) in alphabetical order. Y
 - **Don't rewrite the LICENSE** in a PR. The project is Apache 2.0; relicensing requires unanimous contributor consent (and is not on the roadmap).
 - **Don't merge your own PR** without an approving review.
 
+## Releasing (maintainers)
+
+When bumping the version, keep these in lockstep so they never drift: `pyproject.toml` (`version`), `CITATION.cff` (`version`), the `agent_shield/__init__.py` metadata fallback, and the README status badge — then tag. A `v*` git tag triggers the PyPI publish workflow, so tag only once all of the above agree.
+
 ## Questions?
 
 Open a GitHub Issue. For security reports, use GitHub private vulnerability reporting (see [`SECURITY.md`](./SECURITY.md)).

@@ -11,6 +11,7 @@
 *.json text
 *.yml text
 *.svg text
+*.ts text
 *.png binary
 *.jpg binary
 *.gif binary

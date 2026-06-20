@@ -84,6 +84,10 @@ jobs:
           python -c "from agent_shield import bash_guard, write_guard, GuardResult; r = bash_guard.check_command('rm -rf /'); assert r.decision == 'deny', f'Expected deny, got {r.decision}'; print('OK:', r.decision, '|', r.reason)"
           echo '{"tool_input":{"command":"rm -rf /"}}' | python -m agent_shield.bash_guard | python -c 'import json,sys; d=json.load(sys.stdin)["hookSpecificOutput"]["permissionDecision"]; print("CLI decision:", d); assert d == "deny"'
 
+      - name: Verify the OpenClaw adapter plugin ships in the wheel
+        run: |
+          python -c "import agent_shield, pathlib; p = pathlib.Path(agent_shield.__file__).parent / 'adapters' / 'openclaw_plugin.ts'; assert p.is_file(), f'openclaw_plugin.ts missing from installed package at {p}'; print('OK: openclaw_plugin.ts present at', p)"
+
   publish-pypi:
     name: publish to PyPI (OIDC trusted publishing)
     needs: [build, verify]

@@ -17,7 +17,7 @@ You'll watch the live guard:
 | `git push --force origin main` | 🟡 **ask** | risky but legitimate — surfaced for your decision |
 | `ls -la` | 🟢 **allow** | safe — passes silently, exit 0 |
 
-Requires agent-shield installed (`pip install agent-shield`, or `pip install -e .`
+Requires agent-shield installed (`pip install git+https://github.com/esoteric1entity/agent-shield.git` for now, `pip install agent-shield` after the PyPI release, or `pip install -e .`
 from a checkout). Pure Python — no other dependencies. Point the demo at a
 specific interpreter with `PYTHON=/path/to/python bash demo/demo.sh`.
 
