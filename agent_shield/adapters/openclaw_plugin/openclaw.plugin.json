@@ -1,0 +1,10 @@
+{
+  "id": "agent-shield",
+  "name": "agent-shield",
+  "enabledByDefault": true,
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

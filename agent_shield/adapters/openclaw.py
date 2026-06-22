@@ -11,8 +11,8 @@ Decision logic is the SAME neutral core the Claude Code adapter uses, so an
 equivalent action yields an identical GuardResult across harnesses. Fail-open on
 unparseable/unknown input, matching the Claude Code adapter's documented posture.
 
-The thin TypeScript companion plugin (adapters/openclaw_plugin.ts) calls this via
-subprocess and returns this dict from its before_tool_call handler.
+The thin TypeScript companion plugin (adapters/openclaw_plugin/index.ts) calls this
+via subprocess and returns this dict from its before_tool_call handler.
 """
 from __future__ import annotations
 

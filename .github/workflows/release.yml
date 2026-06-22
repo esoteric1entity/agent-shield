@@ -86,7 +86,7 @@ jobs:
 
       - name: Verify the OpenClaw adapter plugin ships in the wheel
         run: |
-          python -c "import agent_shield, pathlib; p = pathlib.Path(agent_shield.__file__).parent / 'adapters' / 'openclaw_plugin.ts'; assert p.is_file(), f'openclaw_plugin.ts missing from installed package at {p}'; print('OK: openclaw_plugin.ts present at', p)"
+          python -c "import agent_shield, pathlib; d = pathlib.Path(agent_shield.__file__).parent / 'adapters' / 'openclaw_plugin'; req = ['index.ts', 'openclaw.plugin.json', 'package.json']; missing = [f for f in req if not (d / f).is_file()]; assert not missing, f'OpenClaw plugin files missing from installed package under {d}: {missing}'; print('OK: OpenClaw plugin dir ships at', d, 'with', req)"
 
   publish-pypi:
     name: publish to PyPI (OIDC trusted publishing)
