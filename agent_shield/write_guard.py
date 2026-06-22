@@ -127,7 +127,11 @@ def _normalize_path(file_path: str) -> str:
 # =============================================================================
 # RED TIER — Hard block. Self-modification of security infrastructure.
 # =============================================================================
-_RED_PATTERNS: Final[tuple[tuple[re.Pattern[str], str], ...]] = (
+_RED_PATTERNS: Final[tuple[tuple[re.Pattern[str], str, str], ...]] = (
+    # Each entry is (pattern, reason, pattern_id). The ``pattern_id`` is a short
+    # descriptive snake_case slug single-sourced HERE (the RED table is the one
+    # source of truth — ``is_red()`` and ``--red-only`` read it, no codegen/drift).
+    # The regexes and reasons are UNCHANGED; only the id field is added.
     # The hooks themselves (self-modification attack vector).
     # Hardening fix (2026-06-08): also protect the canonical Python
     # package files. The previous pattern only matched the legacy `hooks/scripts/*.sh`
@@ -138,21 +142,25 @@ _RED_PATTERNS: Final[tuple[tuple[re.Pattern[str], str], ...]] = (
     (
         re.compile(r"(^|/)agent_shield/(bash_guard|write_guard|_result|__init__)\.py$"),
         "Cannot modify active agent-shield guard module (self-modification attack vector)",
+        "self_modify_guard_module",
     ),
     # The legacy bash deployment (kept for back-compat with installs using the bash hooks).
     (
         re.compile(r"hooks/scripts/(bash-guard|write-guard)\.sh$"),
         "Cannot modify active security hook scripts",
+        "self_modify_hook_script",
     ),
     # Claude's settings.json
     (
         re.compile(r"\.claude/settings\.json$"),
         "Cannot modify Claude settings.json (contains hook/permission configs)",
+        "claude_settings_json",
     ),
     # Claude's settings.local.json
     (
         re.compile(r"\.claude/settings\.local\.json$"),
         "Cannot modify Claude settings.local.json (contains hook/permission configs)",
+        "claude_settings_local_json",
     ),
     # SSH private keys — UNAMBIGUOUSLY secret (id_rsa / id_ed25519 / …), so a
     # hard block has effectively no false positives. (The generic `.pem`/`.key`
@@ -162,12 +170,14 @@ _RED_PATTERNS: Final[tuple[tuple[re.Pattern[str], str], ...]] = (
     (
         re.compile(r"(^|/)\.ssh/id_[a-z0-9_]+$"),
         "Cannot overwrite SSH private key",
+        "ssh_private_key",
     ),
     # OpenClaw environment file (per-provider API keys) — same class as
     # .claude/settings.json: the agent's own credential surface.
     (
         re.compile(r"\.openclaw/\.env$"),
         "Cannot modify .openclaw/.env (agent API credentials)",
+        "openclaw_env",
     ),
 )
 
@@ -279,7 +289,7 @@ def check_path(file_path: str) -> GuardResult:
     norm_path = _normalize_path(file_path)
 
     # RED tier — hard block (first match wins)
-    for pattern, reason in _RED_PATTERNS:
+    for pattern, reason, _pattern_id in _RED_PATTERNS:
         if pattern.search(norm_path):
             return GuardResult(decision="deny", reason=reason)
 
@@ -290,6 +300,39 @@ def check_path(file_path: str) -> GuardResult:
 
     # GREEN tier — allow silently
     return GuardResult(decision="allow")
+
+
+def is_red(file_path: str) -> tuple[bool, str]:
+    """Return whether ``file_path`` hits a RED pattern, with its ``pattern_id``.
+
+    Normalizes the path the SAME way :func:`check_path` does, then reuses
+    ``_RED_PATTERNS`` (the single source of truth) with the same
+    first-match-wins order — so the reported ``pattern_id`` always identifies
+    the entry that ``check_path`` would deny on.
+
+    Returns:
+        ``(True, pattern_id)`` on the first RED match, else ``(False, "")``.
+        Empty/None or over-cap input is treated as not-RED (``(False, "")``).
+    """
+    if not file_path or len(file_path) > _MAX_INPUT_CHARS:
+        return (False, "")
+    norm_path = _normalize_path(file_path)
+    for pattern, _reason, pattern_id in _RED_PATTERNS:
+        if pattern.search(norm_path):
+            return (True, pattern_id)
+    return (False, "")
+
+
+def _run_red_only(file_path: str) -> int:
+    """``--red-only`` sub-mode: print ``{"red": bool, "pattern_id": str}``.
+
+    A library/CI probe that exposes the RED verdict alone (no YELLOW/GREEN,
+    no hook JSON). Always returns 0 — same never-crash contract as the hook
+    path.
+    """
+    red, pattern_id = is_red(file_path)
+    sys.stdout.write(json.dumps({"red": red, "pattern_id": pattern_id}))
+    return 0
 
 
 def _extract_path_from_hook_input(input_text: str) -> str:
@@ -338,8 +381,14 @@ def main(argv: list[str] | None = None) -> int:
     parsed cannot be evaluated and is therefore allowed, matching the bash
     source's parse-failure default.
     """
-    _ = argv  # not used; reserved for future flags
     try:
+        if argv and "--red-only" in argv:
+            # --red-only <path>: emit only the RED verdict + pattern_id.
+            # The next positional (first non-flag token after --red-only) is the
+            # path; a missing positional yields the not-RED verdict (no crash).
+            rest = argv[argv.index("--red-only") + 1:]
+            path = next((tok for tok in rest if not tok.startswith("-")), "")
+            return _run_red_only(path)
         stream = getattr(sys.stdin, "buffer", None)
         if stream is not None:
             raw = stream.read(_MAX_READ_BYTES + 1)
