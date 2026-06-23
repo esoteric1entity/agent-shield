@@ -37,6 +37,7 @@ License: Apache-2.0
 from __future__ import annotations
 
 import os
+import sys
 import tomllib
 import warnings
 from dataclasses import dataclass, field
@@ -48,6 +49,48 @@ from pathlib import Path
 DEFAULT_COMPLIANCE = "general"
 DEFAULT_MODE = "strict"
 DEFAULT_AUDIT_PATH = "~/.agent-shield/audit.jsonl"
+
+#: Error-path POSTURE defaults (guard slice). These govern behavior when an
+#: evaluation cannot complete; they NEVER relax a built-in detection pattern.
+#: ``error_policy`` here is the NEUTRAL default — harness-specific defaults
+#: (e.g. CC=observe) are layered in a later task, not here.
+ERROR_POLICIES = ("open", "closed", "ask", "observe")
+DEFAULT_ERROR_POLICY = "closed"
+DEFAULT_UNATTENDED = False
+DEFAULT_ASK_TIMEOUT_MS = 60000
+DEFAULT_SPAWN_TIMEOUT_MS = 5000
+DEFAULT_HEALTH_PROBE = True
+
+#: Semantics of ``GuardConfig.health_probe`` (E4 LOCKED). When ``True``, a tripped
+#: circuit-breaker MAY perform periodic re-probes to detect guard recovery; when
+#: ``False``, re-probing is disabled. There is **NO bootstrap grace** — the breaker
+#: denies from call 1 regardless of this value. The actual re-probe cadence, TTL,
+#: and breaker implementation live in the harness adapters (Phases C2/D2).
+HEALTH_PROBE_ENABLES_REPROBE = True
+HEALTH_PROBE_NO_BOOTSTRAP_GRACE = True
+
+#: Inclusive [min, max] millisecond ranges for the posture timeouts. An int that
+#: parses but falls OUTSIDE its range is rejected (default kept + a surfaced
+#: UserWarning) — NOT silently clamped — matching the rest of config's
+#: invalid-value handling (a value is either accepted as-given or ignored).
+ASK_TIMEOUT_MS_RANGE = (1000, 600000)
+SPAWN_TIMEOUT_MS_RANGE = (1000, 60000)
+
+#: Recognized harness identifiers (for ``detect_harness`` / the ``harness=`` hint).
+HARNESSES = ("openclaw", "claude_code")
+
+#: Per-harness DEFAULT ``error_policy`` — the harness-default tier (Contract #4)
+#: sits just above built-in defaults and below file/env/kwarg, so it can be
+#: overridden. A harness not listed here (incl. ``None`` / unrecognized) uses the
+#: NEUTRAL :data:`DEFAULT_ERROR_POLICY`.
+HARNESS_ERROR_POLICY_DEFAULT = {
+    "openclaw": "closed",
+    "claude_code": "observe",
+}
+
+#: Env var naming the running HARNESS (highest-priority signal for
+#: ``detect_harness``). Empty / whitespace-only is treated as unset.
+HARNESS_ENV = "AGENT_SHIELD_HARNESS"
 
 #: A policy file is kilobytes; anything larger is rejected fast (local-DoS guard).
 MAX_CONFIG_BYTES = 1_048_576  # 1 MiB
@@ -64,11 +107,27 @@ ENV_KEYS = {
     "AGENT_SHIELD_AUDIT_PATH": "audit.path",
     "AGENT_SHIELD_SANITIZE_STRICT": "sanitize.strict",
     "AGENT_SHIELD_STRUCTURED_OUTPUT_MODE": "structured_output.mode",
+    "AGENT_SHIELD_ERROR_POLICY": "guard.error_policy",
+    "AGENT_SHIELD_UNATTENDED": "guard.unattended",
+    "AGENT_SHIELD_ASK_TIMEOUT_MS": "guard.ask_timeout_ms",
+    "AGENT_SHIELD_SPAWN_TIMEOUT_MS": "guard.spawn_timeout_ms",
+    "AGENT_SHIELD_HEALTH_PROBE": "guard.health_probe",
 }
 
 #: Compliance tiers that tighten input sanitization by default. A subset of the
 #: audit preset names (pinned by test); an unlisted preset defaults to non-strict.
 STRICT_SANITIZE_COMPLIANCE = frozenset({"healthcare", "biotech"})
+
+#: Compliance tiers that FORCE ``guard.error_policy = "closed"`` at the TOP of
+#: precedence — above the harness-default, the config file, the env var, and any
+#: explicit input (Contract #4). These are the "tightening" presets: the ones
+#: that already tighten posture elsewhere (strict sanitization + audit fail-closed),
+#: so a fail-OPEN error posture would contradict the preset's own promise. If the
+#: normal precedence ladder resolved anything other than ``"closed"`` for such a
+#: preset, that override is IGNORED and a UserWarning is surfaced. A NON-tightening
+#: preset (or no preset) forces nothing — the ladder result stands. This governs
+#: ``error_policy`` ONLY; it is DECOUPLED from the preset-derived ``audit.fail_mode``.
+FORCE_CLOSED_COMPLIANCE = frozenset({"healthcare", "biotech"})
 
 _TRUE_TOKENS = frozenset({"1", "true", "yes", "on"})
 _FALSE_TOKENS = frozenset({"0", "false", "no", "off"})
@@ -118,13 +177,41 @@ class StructuredOutputConfig:
 
 @dataclass(frozen=True)
 class GuardConfig:
-    """Runtime-guard slice. Intentionally EMPTY in v0.1 — pattern add-ons
-    (``extra_red`` / ``extra_yellow``) are deferred to v0.2 with their own
-    pre-mortem, because a config that can remove/relax a built-in pattern would
-    be a policy-weakening downgrade in a security tool."""
+    """Runtime-guard slice. Carries ERROR-PATH POSTURE only — how the guard
+    behaves when an evaluation cannot complete. By design these can NEVER relax
+    a built-in detection pattern (pattern add-ons like ``extra_red`` /
+    ``extra_yellow`` remain deferred with their own pre-mortem, because a config
+    that could remove/relax a built-in pattern would be a policy-weakening
+    downgrade in a security tool).
+
+    Fields:
+      - ``error_policy``: posture when evaluation fails — one of
+        :data:`ERROR_POLICIES` (``open`` | ``closed`` | ``ask`` | ``observe``).
+        The NEUTRAL default is ``closed``; harness-specific defaults are layered
+        in a later task, not here.
+      - ``unattended``: whether the guard runs without an interactive operator.
+      - ``ask_timeout_ms`` / ``spawn_timeout_ms``: posture timeouts (raw int at
+        this layer; range validation is layered later).
+      - ``health_probe``: whether a tripped circuit-breaker performs periodic
+        re-probes to detect guard recovery (``True``) or stays tripped without
+        re-probing (``False``). **No bootstrap grace** — the breaker denies from
+        call 1; this field only controls recovery re-probing after the initial trip.
+    """
+
+    error_policy: str = DEFAULT_ERROR_POLICY
+    unattended: bool = DEFAULT_UNATTENDED
+    ask_timeout_ms: int = DEFAULT_ASK_TIMEOUT_MS
+    spawn_timeout_ms: int = DEFAULT_SPAWN_TIMEOUT_MS
+    health_probe: bool = DEFAULT_HEALTH_PROBE
 
     def to_dict(self) -> dict:
-        return {}
+        return {
+            "error_policy": self.error_policy,
+            "unattended": self.unattended,
+            "ask_timeout_ms": self.ask_timeout_ms,
+            "spawn_timeout_ms": self.spawn_timeout_ms,
+            "health_probe": self.health_probe,
+        }
 
 
 @dataclass(frozen=True)
@@ -237,6 +324,36 @@ def _bool_lenient(raw):
     return False, None
 
 
+def _int_from_str(raw):
+    """Env tier: values are always strings — parse a base-10 integer. A non-int
+    (e.g. ``"soon"``, a float string like ``"12.5"``) is rejected so the resolver
+    warns and keeps the default. NOTE: this is the bare parser; range validation
+    is layered on top via :func:`_int_in_range` (a value that parses as an int is
+    accepted by this parser regardless of magnitude)."""
+    if isinstance(raw, str):
+        try:
+            return True, int(raw.strip())
+        except (TypeError, ValueError):
+            return False, None
+    return False, None
+
+
+def _int_in_range(lo, hi):
+    """Factory: parse a base-10 int (via :func:`_int_from_str`) and require it to
+    fall in the INCLUSIVE ``[lo, hi]`` range. A non-int OR an out-of-range int is
+    rejected (ok=False) so the resolver warns and keeps the field default — the
+    value is NOT clamped (config either accepts a value as-given or ignores it,
+    consistent with every other tier/coercer in this module)."""
+
+    def coerce(raw):
+        ok, val = _int_from_str(raw)
+        if ok and lo <= val <= hi:
+            return True, val
+        return False, None
+
+    return coerce
+
+
 def _expand(path_str: str) -> str:
     try:
         return os.path.expanduser(path_str)
@@ -255,6 +372,56 @@ def _env_setting(name: str):
         return None
     v = v.strip()
     return v or None
+
+
+# =============================================================================
+# Harness detection (Contract #4) — total: returns "openclaw" | "claude_code" | None
+# =============================================================================
+def detect_harness() -> str | None:
+    """Best-effort detection of the running harness. **Never raises.**
+
+    Branch order (LOCKED):
+      (a) ``$AGENT_SHIELD_HARNESS`` if set to a recognized value (``openclaw`` /
+          ``claude_code``). An empty/whitespace value is treated as unset; an
+          *unrecognized* value warns and is treated as unset (so detection falls
+          through to the heuristic), mirroring config's invalid-value handling.
+      (b) a conservative ``sys.argv[0]`` basename heuristic — the installed
+          console-script names: ``agent-shield-openclaw-guard`` -> ``openclaw``;
+          the Claude Code PreToolUse hook entries ``agent-shield-bash-guard`` /
+          ``agent-shield-write-guard`` -> ``claude_code``. Only CLEAR signals
+          match; anything else is ignored.
+      (c) ``None`` — unknown harness; the caller uses the neutral default.
+
+    The adapters call this and pass the result as ``config.load(harness=...)``.
+    """
+    try:
+        env = _env_setting(HARNESS_ENV)
+        if env is not None:
+            if env in HARNESSES:
+                return env
+            _warn(
+                f"agent-shield config: ignoring unrecognized {HARNESS_ENV}={env!r} "
+                f"(expected one of {HARNESSES}); detecting from argv instead"
+            )
+
+        argv = getattr(sys, "argv", None) or []
+        argv0 = argv[0] if argv else ""
+        if not isinstance(argv0, str):
+            return None
+        # EXACT basename match (conservative): a substring test would
+        # false-positive on a wrapper like ``my-agent-shield-openclaw-guard-x``.
+        # Only the literal installed console-script names (optionally ``.exe``)
+        # count as a clear signal.
+        base = os.path.basename(argv0).lower()
+        if base.endswith(".exe"):
+            base = base[:-4]
+        if base == "agent-shield-openclaw-guard":
+            return "openclaw"
+        if base in ("agent-shield-bash-guard", "agent-shield-write-guard"):
+            return "claude_code"
+        return None
+    except Exception:  # noqa: BLE001 — detection is best-effort; never crash a caller
+        return None
 
 
 # =============================================================================
@@ -370,6 +537,7 @@ def load(
     audit_path=None,
     sanitize_strict=None,
     structured_output_mode=None,
+    harness=None,
 ):
     """Load configuration. **Total — never raises into a caller** for any input.
 
@@ -377,6 +545,13 @@ def load(
         path: explicit config-file path (highest-priority search leg).
         compliance / audit_path / sanitize_strict / structured_output_mode:
             explicit per-field overrides (highest precedence of all tiers).
+        harness: optional harness hint (``"openclaw"`` / ``"claude_code"``;
+            ``None`` / unrecognized -> neutral). The adapters detect this via
+            :func:`detect_harness` and pass it. It seeds the HARNESS-DEFAULT tier
+            (Contract #4): built-in defaults < harness-default < file < env <
+            kwargs — so it sets the DEFAULT ``error_policy`` for the harness, which
+            the config file and ``AGENT_SHIELD_ERROR_POLICY`` still override
+            (``error_policy`` has no explicit ``load()`` kwarg).
 
     Returns:
         A frozen :class:`Config`. Invalid/missing inputs degrade to built-in
@@ -391,6 +566,7 @@ def load(
         f_audit = _subtable(file_dict, "audit")
         f_sanitize = _subtable(file_dict, "sanitize")
         f_so = _subtable(file_dict, "structured_output")
+        f_guard = _subtable(file_dict, "guard")
 
         # --- compliance (defaults < file < env < kwarg) ---
         compliance_val, _ = _resolve(
@@ -443,6 +619,62 @@ def load(
             ],
         )
 
+        # --- guard slice (error-path POSTURE) ---
+        # These never relax a built-in pattern; an invalid value falls back to
+        # the next-lower tier + a surfaced UserWarning (via _resolve).
+        #
+        # error_policy precedence (Contract #4): built-in < HARNESS-DEFAULT <
+        # file < env < kwarg. The harness-default tier is seeded as _resolve's
+        # `default` arg (the lowest fallback) — so it sets the per-harness
+        # DEFAULT but any file/env value above it still wins. A None/unrecognized
+        # harness hint -> the NEUTRAL DEFAULT_ERROR_POLICY ("closed").
+        harness_default_policy = HARNESS_ERROR_POLICY_DEFAULT.get(harness, DEFAULT_ERROR_POLICY)
+        error_policy_val, _ = _resolve(
+            "guard.error_policy",
+            harness_default_policy,
+            [
+                ("env", _env_setting("AGENT_SHIELD_ERROR_POLICY"), _str_in(ERROR_POLICIES)),
+                ("file", f_guard.get("error_policy"), _str_in(ERROR_POLICIES)),
+            ],
+        )
+        # A tightening compliance preset (healthcare / biotech) FORCES error_policy
+        # to "closed" ABOVE every tier (Contract #4): the preset already promises a
+        # fail-closed posture (strict sanitize + audit fail-closed), so a fail-OPEN
+        # error posture would contradict it. This sits on TOP of the resolved ladder
+        # value — if that value was anything OTHER than "closed" (an open/observe/ask
+        # override arrived via harness-default/file/env), the override is IGNORED and
+        # a UserWarning is surfaced; if it was already "closed" (no override attempt)
+        # we force the same value silently. DECOUPLED from audit.fail_mode (that is
+        # preset-derived via audit.PRESETS on a separate path; not touched here).
+        if compliance_val in FORCE_CLOSED_COMPLIANCE and error_policy_val != "closed":
+            _warn(
+                f"agent-shield config: the {compliance_val} compliance preset forces "
+                f"guard.error_policy='closed'; ignoring the resolved {error_policy_val!r}"
+            )
+            error_policy_val = "closed"
+        unattended_val, _ = _resolve(
+            "guard.unattended",
+            DEFAULT_UNATTENDED,
+            [("env", _env_setting("AGENT_SHIELD_UNATTENDED"), _bool_from_str)],
+        )
+        # Timeouts: an int OUTSIDE its inclusive range is rejected (default kept +
+        # warning), NOT clamped — consistent with every other coercer here.
+        ask_timeout_val, _ = _resolve(
+            "guard.ask_timeout_ms",
+            DEFAULT_ASK_TIMEOUT_MS,
+            [("env", _env_setting("AGENT_SHIELD_ASK_TIMEOUT_MS"), _int_in_range(*ASK_TIMEOUT_MS_RANGE))],
+        )
+        spawn_timeout_val, _ = _resolve(
+            "guard.spawn_timeout_ms",
+            DEFAULT_SPAWN_TIMEOUT_MS,
+            [("env", _env_setting("AGENT_SHIELD_SPAWN_TIMEOUT_MS"), _int_in_range(*SPAWN_TIMEOUT_MS_RANGE))],
+        )
+        health_probe_val, _ = _resolve(
+            "guard.health_probe",
+            DEFAULT_HEALTH_PROBE,
+            [("env", _env_setting("AGENT_SHIELD_HEALTH_PROBE"), _bool_from_str)],
+        )
+
         return Config(
             compliance=compliance_val,
             audit=AuditConfig(
@@ -453,7 +685,13 @@ def load(
             ),
             sanitize=SanitizeConfig(strict=strict_val),
             structured_output=StructuredOutputConfig(mode=mode_val),
-            guard=GuardConfig(),
+            guard=GuardConfig(
+                error_policy=error_policy_val,
+                unattended=unattended_val,
+                ask_timeout_ms=ask_timeout_val,
+                spawn_timeout_ms=spawn_timeout_val,
+                health_probe=health_probe_val,
+            ),
         )
     except Exception as e:  # noqa: BLE001 — the never-crash contract (mirrors audit._append)
         _warn(f"agent-shield config: unexpected error ({e!r}); using built-in defaults")

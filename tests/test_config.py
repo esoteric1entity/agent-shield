@@ -74,7 +74,6 @@ def test_dataclasses_are_frozen():
     for obj in (cfg, cfg.audit, cfg.sanitize, cfg.structured_output, cfg.guard):
         assert dataclasses.is_dataclass(obj)
         with pytest.raises(dataclasses.FrozenInstanceError):
-            object.__setattr__  # sanity: frozen set must raise
             setattr(obj, "compliance", "x")
 
 
@@ -419,7 +418,7 @@ def test_config_imports_are_stdlib_only():      # H16
     import ast
     from pathlib import Path
     src = Path(config.__file__).read_text(encoding="utf-8")
-    allowed = {"tomllib", "os", "pathlib", "dataclasses", "typing",
+    allowed = {"tomllib", "os", "sys", "pathlib", "dataclasses", "typing",
                "warnings", "__future__", "agent_shield"}
     roots = set()
     for node in ast.walk(ast.parse(src)):

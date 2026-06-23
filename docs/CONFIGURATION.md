@@ -74,6 +74,12 @@ strict = false
 
 [structured_output]
 mode = "strict"                 # strict | lenient
+
+[guard]
+error_policy = "closed"         # open | closed | ask | observe
+# NOTE: in v0.2 only error_policy has a config-file tier. The other guard.*
+# fields (unattended, ask_timeout_ms, spawn_timeout_ms, health_probe) are
+# env-only; writing them here has no effect and is silently ignored.
 ```
 
 | Key | Type | Default | Notes |
@@ -82,6 +88,11 @@ mode = "strict"                 # strict | lenient
 | `audit.path` | str | `~/.agent-shield/audit.jsonl` | A leading `~` is expanded; a non-string is rejected (default kept). |
 | `sanitize.strict` | bool | preset-derived | `false` for `general`; `true` for `healthcare`/`biotech`. Must be a real TOML bool — a quoted `"false"` is a mistype (rejected, default kept), so a string can never silently flip strictness. |
 | `structured_output.mode` | str | `strict` | Validated against `structured_output.MODES` (`strict`/`lenient`). |
+| `guard.error_policy` | str | harness-derived (`closed`/`observe`) | Error-path posture. In v0.2 this is the **only** guard field with a config-file tier; tightening presets (`healthcare`/`biotech`) force it to `closed` above all tiers. |
+| `guard.unattended` | bool | `false` | Env-only in v0.2. |
+| `guard.ask_timeout_ms` | int | `60000` | Env-only in v0.2; must be in `[1000, 600000]`. |
+| `guard.spawn_timeout_ms` | int | `5000` | Env-only in v0.2; must be in `[1000, 60000]`. |
+| `guard.health_probe` | bool | `true` | Env-only in v0.2; re-probe toggle, no bootstrap grace. |
 
 `audit.retention_days`, `audit.fail_mode`, and `audit.content_fields_always` are
 **derived from the compliance preset and reported read-only** — there is no
@@ -116,7 +127,7 @@ test), then surface here.
 
 ## Search path & precedence
 
-`load(path=None, *, compliance=None, audit_path=None, sanitize_strict=None, structured_output_mode=None)`
+`load(path=None, *, compliance=None, audit_path=None, sanitize_strict=None, structured_output_mode=None, harness=None)`
 
 **File search** (first existing path wins):
 
@@ -149,10 +160,50 @@ Settings (distinct from the `AGENT_SHIELD_CONFIG` *path* variable):
 | Variable | Sets |
 |---|---|
 | `AGENT_SHIELD_CONFIG` | the config *file* location (search leg 2) |
+| `AGENT_SHIELD_HARNESS` | harness hint for `detect_harness()` (`openclaw` / `claude_code`; empty/unrecognized values are treated as unset) |
 | `AGENT_SHIELD_COMPLIANCE` | `compliance` |
 | `AGENT_SHIELD_AUDIT_PATH` | `audit.path` |
 | `AGENT_SHIELD_SANITIZE_STRICT` | `sanitize.strict` (truthy `1/true/yes/on`, falsy `0/false/no/off`, case-insensitive; anything else is ignored + warned) |
 | `AGENT_SHIELD_STRUCTURED_OUTPUT_MODE` | `structured_output.mode` |
+| `AGENT_SHIELD_ERROR_POLICY` | `guard.error_policy` — error-path posture, one of `open`/`closed`/`ask`/`observe` (neutral default `closed`); an unknown value is ignored + warned |
+| `AGENT_SHIELD_UNATTENDED` | `guard.unattended` (bool; same truthy/falsy tokens as `AGENT_SHIELD_SANITIZE_STRICT`) |
+| `AGENT_SHIELD_ASK_TIMEOUT_MS` | `guard.ask_timeout_ms` (int milliseconds, default `60000`; must be in `[1000, 600000]` — a non-int or out-of-range value is ignored + warned, never clamped) |
+| `AGENT_SHIELD_SPAWN_TIMEOUT_MS` | `guard.spawn_timeout_ms` (int milliseconds, default `5000`; must be in `[1000, 60000]` — a non-int or out-of-range value is ignored + warned, never clamped) |
+| `AGENT_SHIELD_HEALTH_PROBE` | `guard.health_probe` (bool; default `true`) |
+
+The `guard.*` settings are **error-path posture** — they govern what the guard
+does when an evaluation cannot complete, and (like the rest of config) can never
+relax a built-in detection pattern. They are reported on `cfg.guard`. An
+`error_policy` is checked against the four allowed values; each timeout must parse
+as an integer **and** fall within its documented millisecond range (otherwise the
+field default is kept + a warning is surfaced — values are never clamped).
+
+The **default** `error_policy` is harness-aware: when an adapter passes a harness
+hint (`config.load(harness=...)`, derived from `config.detect_harness()`), the
+default becomes `closed` for OpenClaw and `observe` for Claude Code; with no hint
+(or an unrecognized one) the neutral `closed` default applies. This is only the
+*default* — a config-file value or an env var still overrides it (built-in
+defaults < harness-default < file < env). The guard fields have **no explicit
+`load()` kwargs** in v0.2 (only `harness` is passed); if an explicit per-field
+override is needed later it will be added with its own review.
+
+`health_probe` (default `true`) controls whether a tripped circuit-breaker
+performs periodic re-probes to detect guard recovery. When `false`, the breaker
+stays tripped without re-probing. There is **no bootstrap grace**: the breaker
+still denies from call 1; `health_probe` only affects recovery re-probing *after*
+the initial trip. The actual re-probe cadence, TTL, and breaker implementation
+are harness-specific and live in the adapter layers (OpenClaw module-level,
+Claude Code file-backed).
+
+One override to that ladder: a **tightening** compliance preset (`healthcare` /
+`biotech`) **forces** `error_policy = closed` above *all* tiers. Those presets
+already promise a fail-closed posture (strict sanitization + audit fail-closed),
+so a fail-open error posture would contradict them. If a config-file value, env
+var, or harness default resolved to anything other than `closed`, that value is
+ignored + a warning is surfaced; an already-`closed` value is kept silently. This
+governs `error_policy` only — it is **decoupled** from the preset-derived
+`audit.fail_mode` (a separate, audit-layer value). A non-tightening preset (e.g.
+`general`) forces nothing.
 
 `AGENT_SHIELD_ACTOR`, `AGENT_SHIELD_ROLE`, `AGENT_SHIELD_SESSION`, and
 `AGENT_SHIELD_MACHINE` are **audit runtime fields, not config keys** — config
