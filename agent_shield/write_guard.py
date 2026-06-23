@@ -75,8 +75,11 @@ def _collapse_segments(norm: str) -> str:
     return ("/" + joined) if rooted else joined
 
 
-def _normalize_path(file_path: str) -> str:
+def normalize_path(file_path: str) -> str:
     """Normalize a file path for guard matching.
+
+    Public: reused by the self-lockout allowlist (Phase F2) so path-prefix
+    tests match the same equivalence class the write guard uses.
 
     Collapses the Windows path-equivalence class so a ``$``-anchored RED
     pattern can't be bypassed by a path that resolves to the SAME file:
@@ -191,7 +194,7 @@ _YELLOW_PATTERNS: Final[tuple[tuple[re.Pattern[str], str], ...]] = (
     # to be user-edited. Two default basenames; a config at a non-default
     # $AGENT_SHIELD_CONFIG location cannot be matched by a static pattern (a
     # stated limitation — see docs/CONFIGURATION.md). Anchored on the basename so
-    # ~-expansion / absolute / relative spellings all collapse via _normalize_path.
+    # ~-expansion / absolute / relative spellings all collapse via normalize_path.
     (
         re.compile(r"(^|/)agent-shield\.toml$", re.IGNORECASE),
         "Modifying agent-shield policy config — confirm intentional (config is not a trust boundary)",
@@ -286,7 +289,7 @@ def check_path(file_path: str) -> GuardResult:
             reason="Path exceeds the size cap and was not fully evaluated — confirm manually",
         )
 
-    norm_path = _normalize_path(file_path)
+    norm_path = normalize_path(file_path)
 
     # RED tier — hard block (first match wins)
     for pattern, reason, _pattern_id in _RED_PATTERNS:
@@ -316,11 +319,23 @@ def is_red(file_path: str) -> tuple[bool, str]:
     """
     if not file_path or len(file_path) > _MAX_INPUT_CHARS:
         return (False, "")
-    norm_path = _normalize_path(file_path)
+    norm_path = normalize_path(file_path)
     for pattern, _reason, pattern_id in _RED_PATTERNS:
         if pattern.search(norm_path):
             return (True, pattern_id)
     return (False, "")
+
+
+def is_red_or_over_cap(file_path: str) -> tuple[bool, str]:
+    """Error-path RED probe: fail-closed on over-cap input.
+
+    See :func:`bash_guard.is_red_or_over_cap` for rationale. On the error
+    path we cannot run the full RED regex on oversized input, so we treat it as
+    RED-by-default to avoid a fail-open hole.
+    """
+    if len(file_path) > _MAX_INPUT_CHARS:
+        return (True, "over_cap")
+    return is_red(file_path)
 
 
 def _run_red_only(file_path: str) -> int:

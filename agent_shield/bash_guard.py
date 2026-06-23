@@ -455,6 +455,25 @@ def is_red(cmd: str) -> tuple[bool, str]:
     return (False, "")
 
 
+def is_red_or_over_cap(cmd: str) -> tuple[bool, str]:
+    """Error-path RED probe: fail-closed on over-cap input.
+
+    On the normal evaluation path ``is_red`` correctly returns ``(False, "")``
+    for over-cap input because ``check_command`` already short-circuits to
+    ``ask``. On the *error* path, however, we cannot evaluate at all, so an
+    oversized catastrophic command would otherwise fall through to the policy
+    tier (a fail-open hole for ``observe`` / ``open``). This wrapper treats any
+    input over ``_MAX_INPUT_CHARS`` as RED-by-default.
+
+    Returns:
+        ``(True, "over_cap")`` if ``len(cmd) > _MAX_INPUT_CHARS``; otherwise
+        delegates to :func:`is_red`.
+    """
+    if len(cmd) > _MAX_INPUT_CHARS:
+        return (True, "over_cap")
+    return is_red(cmd)
+
+
 def _run_red_only(command: str) -> int:
     """``--red-only`` sub-mode: print ``{"red": bool, "pattern_id": str}``.
 

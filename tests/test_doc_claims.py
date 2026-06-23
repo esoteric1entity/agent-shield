@@ -126,7 +126,7 @@ def test_normalize_path_docstring_states_ascii_only_contract():
     strip ASCII whitespace only. The docstring must document the ASCII-only
     contract and may mention NBSP only in the negated 'NOT stripped' sense, so
     the overclaim cannot silently return."""
-    doc = write_guard._normalize_path.__doc__ or ""
+    doc = write_guard.normalize_path.__doc__ or ""
     assert "ASCII whitespace" in doc, "docstring must document the ASCII-only strip contract"
     assert "**NOT** stripped" in doc, "docstring must state non-ASCII whitespace (NBSP) is NOT stripped"
 

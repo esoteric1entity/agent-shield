@@ -55,6 +55,59 @@ share a uniform 11-field shape.
 
 ---
 
+## Error-path records (`guard_unavailable`)
+
+When a guard cannot evaluate an action (binary missing, timeout, nonzero exit,
+spawn failure, unparseable output), the error-path resolver still makes a terminal
+decision and records it under the `guard_unavailable` action. These rows are
+**decisions about a failed evaluation**, not evaluations of the action itself:
+
+- `action` is always `"guard_unavailable"`.
+- `outcome` is the terminal decision: `"allow"`, `"ask"`, or `"deny"`.
+- `target` is the raw command/path, sanitized before logging (see below).
+- `details` carries the resolver metadata:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `trigger` | string | Why evaluation failed: `binary_missing`, `spawn_fail`, `timeout`, `nonzero_exit`, `unparseable`. |
+| `action_tier` | string | The tier the original action would have been evaluated under (e.g. `red`/`yellow`/`green`), or `"unknown"`. |
+| `attended` | bool | Whether a human operator was present to answer an `ask` prompt. |
+| `outcome_reason` | string | One of the 7 canonical resolver reason strings (see below). |
+| `guard_authoritative` | bool | Always `false` — the guard did not evaluate the action, so the decision is a policy fallback, not an authoritative guard verdict. |
+| `error_policy` | string | The configured error policy (`open`, `closed`, `ask`, `observe`). |
+| `harness` | string \| null | The harness that triggered the record (`claude_code`, `openclaw`, etc.), or `null`. |
+
+### Canonical `outcome_reason` strings
+
+The resolver exports exactly these 7 strings. They live in `details.outcome_reason`;
+the top-level `outcome` is always the terminal decision.
+
+| `outcome_reason` | `outcome` | Semantics |
+|---|---|---|
+| `allowed-selfrepair` | `allow` | A self-repair/self-lockout allowlist match (e.g. reinstalling agent-shield) — the only path that skips the catastrophic-RED check. |
+| `allowed-unevaluated` | `allow` | `error_policy=open` and the action is not catastrophic-RED. |
+| `asked-unevaluated` | `ask` | `error_policy=ask` while attended — prompt the operator. |
+| `would-have-asked` | `deny` | `error_policy=ask` but unattended — cannot prompt, so fail closed. |
+| `would-have-blocked` | `allow` | `error_policy=observe` — the command is allowed but would have been denied under `closed`; this reason triggers extra visibility (banner + counter). |
+| `denied-unevaluated` | `deny` | `error_policy=closed` (or unknown policy). |
+| `denied-catastrophic-unevaluated` | `deny` | A known-catastrophic action (e.g. `rm -rf /`, guarded config files) is denied even on the error path. |
+
+### Target sanitization policy
+
+To reduce secret leakage when the raw command/path is written unevaluated:
+
+1. **Credential-like token redaction** — obvious secret-bearing substrings are
+   replaced with `"<redacted>"` before the target is logged. The heuristic matches
+   environment-style assignments (`TOKEN=...`, `PASSWORD=...`) and header/key-style
+   values (`Authorization: Bearer ...`, `X-Api-Key: ...`).
+2. **Length cap** — the sanitized target is truncated to **4096 characters**
+   with an appended `"..."` suffix if it exceeds the cap.
+
+Sanitization is best-effort and fail-safe: a malformed input or regex edge case
+never raises out of the audit path; the target falls back to `"<sanitization-error>"`.
+
+---
+
 ## Canonical serialization
 
 Hashing uses a deterministic, language-neutral form so the same logical entry
