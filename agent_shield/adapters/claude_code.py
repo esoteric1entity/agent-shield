@@ -39,30 +39,36 @@ def _get_config_and_log():
 
 
 def _record_normal(audit_log, tool: str, raw: str, result: GuardResult, tool_input: dict) -> None:
-    """Record a normal-path guard outcome. Audit failures are swallowed by the
-    default fail-open preset — the hook response must never depend on logging."""
+    """Record a normal-path guard outcome. Audit write failures are swallowed —
+    the hook response must never depend on logging, regardless of the audit log's
+    configured fail_mode."""
     from .. import audit
 
-    details = {"reason": result.reason}
-    if tool == "Bash":
-        audit_log.record(action="bash", target=raw, outcome=result.decision, details=details)
-        return
+    try:
+        details = {"reason": result.reason}
+        if tool == "Bash":
+            audit_log.record(action="bash", target=raw, outcome=result.decision, details=details)
+            return
 
-    # Write/Edit/MultiEdit: record_write when content is available; otherwise
-    # a plain write record. The CC PreToolUse payload carries "content" for Write
-    # and "old_string"/"new_string" for Edit; we only hash when explicit content
-    # slots are supplied to avoid extra file I/O on the hot path.
-    if "content" in tool_input or "content_after" in tool_input or "content_before" in tool_input:
-        content_after = tool_input.get("content_after", tool_input.get("content"))
-        audit_log.record_write(
-            target=raw,
-            outcome=result.decision,
-            content_before=tool_input.get("content_before"),
-            content_after=content_after,
-            details=details,
-        )
-    else:
-        audit_log.record(action="write", target=raw, outcome=result.decision, details=details)
+        # Write/Edit/MultiEdit: record_write when content is available; otherwise
+        # a plain write record. The CC PreToolUse payload carries "content" for Write
+        # and "old_string"/"new_string" for Edit; we only hash when explicit content
+        # slots are supplied to avoid extra file I/O on the hot path.
+        if "content" in tool_input or "content_after" in tool_input or "content_before" in tool_input:
+            content_after = tool_input.get("content_after", tool_input.get("content"))
+            audit_log.record_write(
+                target=raw,
+                outcome=result.decision,
+                content_before=tool_input.get("content_before"),
+                content_after=content_after,
+                details=details,
+            )
+        else:
+            audit_log.record(action="write", target=raw, outcome=result.decision, details=details)
+    except audit.AuditWriteError:
+        # Fail-open for the adapter: a logging failure must not change the guard
+        # decision delivered to the harness.
+        pass
 
 
 def _resolve_cannot_evaluate(tool: str, raw: str, result: GuardResult) -> GuardResult:

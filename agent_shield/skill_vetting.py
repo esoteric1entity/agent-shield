@@ -458,16 +458,22 @@ def vet_path(path: str | Path) -> VetResult:
         return VetResult(0, "review", [], "target could not be resolved — cannot vet")
 
     if root.is_file():
-        files = [root]
+        entries = [root]
         base = root.parent
     else:
-        files = sorted(p for p in root.rglob("*") if p.is_file())
+        # Include file symlinks as files, and directory symlinks/junctions as
+        # entries, so we can detect and bound them even when rglob does not
+        # descend into a directory link on a given Python/platform combination.
+        entries = sorted(
+            p for p in root.rglob("*")
+            if p.is_file() or _is_symlink_or_junction(p)
+        )
         base = root
 
     findings: list[Finding] = []
     files_seen = 0
     bytes_scanned = 0
-    for p in files:
+    for p in entries:
         files_seen += 1
         if files_seen > _MAX_FILES:
             findings.append(Finding(
@@ -497,6 +503,12 @@ def vet_path(path: str | Path) -> VetResult:
                 _UNSCANNED["id"], _UNSCANNED["severity"], rel, 0, "",
                 "Path could not be resolved — not scanned",
             ))
+            continue
+
+        # Directory symlinks/junctions inside the root are bounded above, but they
+        # are not files and must not be read as text. Their contents are either
+        # yielded separately by rglob or, if rglob did not descend, not scanned.
+        if not p.is_file():
             continue
 
         try:

@@ -423,8 +423,10 @@ def detect_harness() -> str | None:
         # EXACT basename match (conservative): a substring test would
         # false-positive on a wrapper like ``my-agent-shield-openclaw-guard-x``.
         # Only the literal installed console-script names (optionally ``.exe``)
-        # count as a clear signal.
-        base = os.path.basename(argv0).lower()
+        # count as a clear signal. Normalize Windows paths so the heuristic works
+        # when a Windows argv0 is inspected on a non-Windows host (e.g. CI).
+        normalized = argv0.replace("\\", "/")
+        base = os.path.basename(normalized).lower()
         if base.endswith(".exe"):
             base = base[:-4]
         if base == "agent-shield-openclaw-guard":
