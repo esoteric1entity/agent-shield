@@ -61,9 +61,9 @@ _WRITE_ENTRY: dict[str, Any] = {
     ],
 }
 
-#: Legacy Phase P3 shapes that the CLI may have written during earlier v0.2
-#: alphas. ``disable`` removes these too so users do not end up with stale,
-#: non-functional entries after the format correction.
+#: Legacy Phase P3 shapes that the CLI may have written during earlier
+#: pre-Phase-P3 alphas. ``disable`` removes these too so users do not end up
+#: with stale, non-functional entries after the format correction.
 _LEGACY_BASH_ENTRY: dict[str, Any] = {
     "hookEventName": "PreToolUse",
     "toolNamePattern": "Bash",
@@ -178,11 +178,26 @@ def _agent_entries(entries: list[Any]) -> list[int]:
     """Return indices of entries that match the agent-shield shapes.
 
     Recognises both the canonical ``matcher`` + ``hooks`` shape and the
-    legacy ``toolNamePattern`` + ``command`` shape written by earlier v0.2
-    alphas, so ``disable`` cleans up stale entries correctly.
+    legacy ``hookEventName`` + ``command`` shape written by earlier alphas,
+    so ``disable`` cleans up stale entries correctly.
     """
     targets = (_BASH_ENTRY, _WRITE_ENTRY, _LEGACY_BASH_ENTRY, _LEGACY_WRITE_ENTRY)
-    return [i for i, entry in enumerate(entries) if isinstance(entry, dict) and entry in targets]
+    indices: list[int] = []
+    for i, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            continue
+        if entry in targets:
+            indices.append(i)
+            continue
+        # Fuzzy legacy match: any hookEventName entry that points at the old,
+        # non-functional module target (regardless of extra keys or a custom
+        # toolNamePattern) is also stale wiring we should remove.
+        if (
+            entry.get("hookEventName")
+            and entry.get("command") == "python -m agent_shield.adapters.claude_code"
+        ):
+            indices.append(i)
+    return indices
 
 
 def _ensure_hooks(settings: dict[str, Any]) -> bool:

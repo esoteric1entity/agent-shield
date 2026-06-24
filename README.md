@@ -5,7 +5,7 @@
 > *A **PDuk Brainworks** project. Sibling to the [Ultimate Memory Stack](https://github.com/esoteric1entity/ultimate-memory-stack). Apache-2.0.*
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Status: alpha](https://img.shields.io/badge/Status-v0.1.0a4_alpha-yellow.svg)](#project-status)
+[![Status: alpha](https://img.shields.io/badge/Status-v0.1.0a5_alpha-yellow.svg)](#project-status)
 [![Python: ≥3.11](https://img.shields.io/badge/Python-%E2%89%A53.11-green.svg)](pyproject.toml)
 [![Tests](https://github.com/esoteric1entity/agent-shield/actions/workflows/test.yml/badge.svg)](https://github.com/esoteric1entity/agent-shield/actions/workflows/test.yml)
 
@@ -93,7 +93,17 @@ Wire it into `~/.claude/settings.json` (the **module form** below — `python -m
 }
 ```
 
-**Use it with OpenClaw (or another harness):** the same neutral decision core backs every harness. Wire the OpenClaw `before_tool_call` hook to the `agent-shield-openclaw-guard` console script (or `python -m agent_shield.adapters.openclaw`) — it reads the tool event as JSON on stdin and returns the block / ask / allow decision. See [`docs/adapter_status.md`](docs/adapter_status.md) for the adapter contract and gateway requirement. The library API (`bash_guard.check_command()`, `write_guard.check_path()`) is identical across harnesses.
+**Use it with OpenClaw (or another harness):** the same neutral decision core backs every harness. Wire the OpenClaw `before_tool_call` hook to the `agent-shield-openclaw-guard` console script (or `python -m agent_shield.adapters.openclaw`) — it reads the tool event as JSON on stdin and returns the block / ask / allow decision.
+
+For OpenClaw, the package ships a ready-to-install companion plugin directory inside
+`agent_shield/adapters/openclaw_plugin/`. The exact install command and gateway version
+requirement are in [`docs/adapter_status.md`](docs/adapter_status.md). If you installed
+an earlier alpha that used a bare `export const hooks = {...}` registration, migrate
+to the current plugin-SDK shape; the uninstall and migration steps are in
+[`docs/MIGRATION.md`](docs/MIGRATION.md).
+
+The library API (`bash_guard.check_command()`, `write_guard.check_path()`) is identical
+across harnesses.
 
 ---
 
@@ -270,14 +280,9 @@ log = audit.AuditLog("audit.jsonl",
                      anchor=audit.Anchor(local_path="/mnt/worm/anchor.jsonl"))
 ```
 
-The anchor periodically (every N entries or T minutes — never per-event) copies a minimal receipt — `{seq, entry_hash, ts}`, no PII — to its target, fail-open: a *failing* shipper never blocks the audited write. **Resistance holds only when that target is genuinely independent** — a separate / write-once volume or another host; an anchor on the **same volume** as the log is not independent and stays tamper-evident only.
+The anchor periodically (every N entries or T minutes — never per-event) copies a minimal receipt — `{seq, entry_hash, ts}`, no PII — to its target, fail-open: a *failing* shipper never blocks the audited write. **Resistance holds only when that target is genuinely independent** — a separate / write-once volume or another host; an anchor on the **same volume** as the log is not independent and stays tamper-evident only. The log file is written `0600` and is a **forensic** record, not a live guard. Retention/rotation enforcement is not automated in this release.
 
 **agent-shield never phones home.** The shipped package makes **no outbound network calls** — its only socket use is a local `gethostname()` for the audit machine field, and the built-in anchor writes to a local path only. To anchor off-box, you **bring your own shipper** (a callable that transmits the receipt however you choose); the egress is your code and your policy. There is no `url`/`endpoint` parameter, and the no-network guarantee is checked by a best-effort AST lint in the test suite (not a sandbox). Your shipper runs **synchronously, in-process** and cannot be timed out in v0.1 — keep it fast, or do slow/network work asynchronously yourself. A ready-to-copy recipe and a full risk guide live in [`examples/remote_anchor_shipper.py`](examples/remote_anchor_shipper.py) and [`docs/REMOTE_ANCHORING.md`](docs/REMOTE_ANCHORING.md).
-
-The audit log is **tamper-evident, not tamper-proof**: a hash chain makes undetected
-edits hard, but a sufficiently privileged attacker can delete or rebuild the file. It
-is written `0600` and is a **forensic** record, not a live guard. Retention/rotation
-enforcement is not automated in this release.
 
 Full field reference, verification procedure, and limits: [`docs/AUDIT_SCHEMA.md`](docs/AUDIT_SCHEMA.md).
 
@@ -331,7 +336,7 @@ The CLI reads `{"tool_input": {"command": "..."}}` (for `bash_guard`) or `{"tool
 
 Input that cannot be parsed at all cannot be evaluated and is **allowed** — see [Bypasses and limitations](#bypasses-and-limitations) for why, and what that means for you.
 
-For deployments without Python, the `tests/bash-guard.sh` and `tests/write-guard.sh` sources are **decision-equivalent** (verified to produce equivalent decisions; human-readable reason strings may differ in wording) and can be used directly. When the bash guards find no working Python interpreter, RED checks additionally scan the raw hook JSON — degraded parsing fails **closed** for the dangerous tier.
+For deployments without Python, the `tests/bash-guard.sh` and `tests/write-guard.sh` sources are **decision-equivalent** (verified to produce equivalent decisions; human-readable reason strings may differ in wording) and can be used directly. These sources are **not installed by `pip install agent-shield`**; copy them manually from the repository if you need them. When the bash guards find no working Python interpreter, RED checks additionally scan the raw hook JSON — degraded parsing fails **closed** for the dangerous tier.
 
 ---
 
@@ -363,7 +368,7 @@ Four suites: Python guard/CLI tests, bash-subprocess equivalence, a bash-native 
 ## Troubleshooting
 
 - **`ModuleNotFoundError: No module named 'agent_shield'`** — the hook/CLI is running under a different Python than the one agent-shield is installed in. Activate the right venv, or point the hook at that interpreter (e.g. `/path/to/venv/bin/python -m agent_shield.bash_guard`).
-- **`ModuleNotFoundError: No module named 'agent_shield'` *after uninstalling*** — `pip uninstall` removed the package, but the two `PreToolUse` hook entries are still in your `settings.json`, so every tool call now fails. If the `agent-shield-plugin` command is still available, run it first: `agent-shield-plugin disable` (or `agent-shield-plugin --project <dir> disable`) to remove them safely. If the CLI is gone because the package was already uninstalled, manually edit the file and remove the two `PreToolUse` entries for `Bash` and `Write|Edit|MultiEdit` that call `agent_shield.bash_guard` / `agent_shield.write_guard`. Then restart. Full steps: [`INSTALL_AGENT.md`](INSTALL_AGENT.md) Step 6.
+- **`ModuleNotFoundError: No module named 'agent_shield'` *after uninstalling*** — `pip uninstall` removed the package, but the two `PreToolUse` hook entries are still in your `settings.json`, so every tool call now fails. If the `agent-shield-plugin` command is still available (Claude Code only), run it first: `agent-shield-plugin disable` (or `agent-shield-plugin --project <dir> disable`) to remove them safely. If the CLI is gone because the package was already uninstalled, manually edit the file and remove the two `PreToolUse` entries for `Bash` and `Write|Edit|MultiEdit` that call `agent_shield.bash_guard` / `agent_shield.write_guard`. Then restart. Full steps: [`INSTALL_AGENT.md`](INSTALL_AGENT.md) Step 6. If you wired during an earlier alpha, your settings may contain a non-functional legacy shape (`hookEventName`/`toolNamePattern`) — migrate via [`docs/MIGRATION.md`](docs/MIGRATION.md).
 - **A safe command produces no output** — that's correct: `allow` is a silent pass (empty stdout, exit 0). Test with a known-bad command (`echo '{"tool_input":{"command":"rm -rf /"}}' | python -m agent_shield.bash_guard`) to see a `deny`.
 - **Hooks don't take effect in Claude Code** — restart the session after editing `settings.json`; hooks are read at startup.
 - **Windows: the bash-parity tests are slow or skip** — the suite resolves Git-Bash/Cygwin explicitly (never the WSL `bash.exe` shim) and skips cleanly if no POSIX bash is found; set `AGENT_SHIELD_TEST_BASH` to a specific `bash.exe` to override. The runtime guards are pure Python and need no bash.

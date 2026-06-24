@@ -15,7 +15,7 @@ console script — a `before_tool_call` event JSON in on stdin, a `BeforeToolCal
 out, which is what the TypeScript companion plugin (`openclaw_plugin/index.ts`) spawns — or as a
 module: `python -m agent_shield.adapters.openclaw`.
 
-**All console scripts.** The package installs four: `agent-shield-bash-guard`, `agent-shield-write-guard`, `agent-shield-vet`, and `agent-shield-openclaw-guard` — for harness hooks and direct CLI use.
+**All console scripts.** The package installs five: `agent-shield-bash-guard`, `agent-shield-write-guard`, `agent-shield-vet`, `agent-shield-openclaw-guard`, and `agent-shield-plugin` — for harness hooks, direct CLI use, and Claude Code settings management.
 
 **Where the plugin lives after install.** The companion plugin ships inside the installed package as a ready-to-install directory at `<site-packages>/agent_shield/adapters/openclaw_plugin/` (`index.ts` + `openclaw.plugin.json` + `package.json`). Locate it with: `python -c "import agent_shield, pathlib; print(pathlib.Path(agent_shield.__file__).parent / 'adapters' / 'openclaw_plugin')"`.
 
@@ -48,12 +48,14 @@ The shipped directory contains:
   (`missing register/activate export`) → no enforcement. `tests/test_openclaw_plugin_shape.py`
   pins this shape so the no-op cannot regress.
 - `openclaw.plugin.json` — `{ "id": "agent-shield", "name": "agent-shield", "enabledByDefault": true, "configSchema": { "type": "object", "additionalProperties": false, "properties": {} } }`
-- `package.json` — `{ "name": "agent-shield", "version": "0.1.0", "type": "module", "openclaw": { "extensions": ["./index.ts"] } }` — the `openclaw.extensions` key is **required** (without it the install falls back to the hook-pack path and errors on a missing `HOOK.md`).
+- `package.json` — `{ "name": "agent-shield", "version": "0.1.0a5", "type": "module", "openclaw": { "extensions": ["./index.ts"] } }` — the `openclaw.extensions` key is **required** (without it the install falls back to the hook-pack path and errors on a missing `HOOK.md`).
 
 The adapter and shared core are covered by `tests/test_adapter_openclaw.py` + the cross-adapter
 equivalence test; the directory install contract above by `tests/test_openclaw_plugin_shape.py`.
 
-**Open posture decision.** The plugin (and the CC adapter + Python core) currently **fail open**
-on a bridge error (missing/erroring guard → allow). A flip to **fail-closed** is under
-consideration (security-first; matches OpenClaw's own `before_tool_call: "fail-closed"` host
-policy) — tracked separately, with its own bridge-error test.
+**Error-policy posture.** Bridge errors (missing/erroring guard) are routed through the
+neutral error-policy resolver (`agent_shield/_error_policy.py`). The default `error_policy`
+is harness-aware: `closed` for OpenClaw and `observe` for Claude Code, so a bridge failure
+in the OpenClaw adapter denies by default. This default can be overridden via the
+`AGENT_SHIELD_ERROR_POLICY` environment variable or the `guard.error_policy` config key; a
+tightening compliance preset (`healthcare`/`biotech`) forces it to `closed` above all tiers.

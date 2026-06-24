@@ -38,7 +38,7 @@ cfg = config.load()
 log = audit.AuditLog(path=cfg.audit.path, preset=cfg.compliance)   # explicit
 ```
 
-## Hook wiring helper (v0.2)
+## Hook wiring helper
 
 For Claude Code, install and remove the `PreToolUse` hooks without hand-editing
 ``~/.claude/settings.json``:
@@ -96,9 +96,9 @@ mode = "strict"                 # strict | lenient
 
 [guard]
 error_policy = "closed"         # open | closed | ask | observe
-# NOTE: in v0.2 only error_policy has a config-file tier. The other guard.*
-# fields (unattended, ask_timeout_ms, spawn_timeout_ms, health_probe) are
-# env-only; writing them here has no effect and is silently ignored.
+# NOTE: error_policy is the only guard.* field with a config-file tier in this
+# release. The other guard.* fields (unattended, ask_timeout_ms, spawn_timeout_ms,
+# health_probe) are env-only; writing them here has no effect and is silently ignored.
 ```
 
 | Key | Type | Default | Notes |
@@ -107,15 +107,15 @@ error_policy = "closed"         # open | closed | ask | observe
 | `audit.path` | str | `~/.agent-shield/audit.jsonl` | A leading `~` is expanded; a non-string is rejected (default kept). |
 | `sanitize.strict` | bool | preset-derived | `false` for `general`; `true` for `healthcare`/`biotech`. Must be a real TOML bool — a quoted `"false"` is a mistype (rejected, default kept), so a string can never silently flip strictness. |
 | `structured_output.mode` | str | `strict` | Validated against `structured_output.MODES` (`strict`/`lenient`). |
-| `guard.error_policy` | str | harness-derived (`closed`/`observe`) | Error-path posture. In v0.2 this is the **only** guard field with a config-file tier; tightening presets (`healthcare`/`biotech`) force it to `closed` above all tiers. |
-| `guard.unattended` | bool | `false` | Env-only in v0.2. |
-| `guard.ask_timeout_ms` | int | `60000` | Env-only in v0.2; must be in `[1000, 600000]`. |
-| `guard.spawn_timeout_ms` | int | `5000` | Env-only in v0.2; must be in `[1000, 60000]`. |
-| `guard.health_probe` | bool | `true` | Env-only in v0.2; re-probe toggle, no bootstrap grace. |
+| `guard.error_policy` | str | harness-derived (`closed`/`observe`) | Error-path posture. In this release it is the **only** guard field with a config-file tier; tightening presets (`healthcare`/`biotech`) force it to `closed` above all tiers. |
+| `guard.unattended` | bool | `false` | Env-only in this release. |
+| `guard.ask_timeout_ms` | int | `60000` | Env-only in this release; must be in `[1000, 600000]`. |
+| `guard.spawn_timeout_ms` | int | `5000` | Env-only in this release; must be in `[1000, 60000]`. |
+| `guard.health_probe` | bool | `true` | Env-only in this release; re-probe toggle, no bootstrap grace. |
 
 `audit.retention_days`, `audit.fail_mode`, and `audit.content_fields_always` are
 **derived from the compliance preset and reported read-only** — there is no
-writable override for them in v0.1 (the audit layer has no such constructor
+writable override for them in this release (the audit layer has no such constructor
 argument; see *Deferred to v0.2*).
 
 Unknown keys and unknown tables are **ignored** (no crash). In particular there
@@ -203,7 +203,7 @@ default becomes `closed` for OpenClaw and `observe` for Claude Code; with no hin
 (or an unrecognized one) the neutral `closed` default applies. This is only the
 *default* — a config-file value or an env var still overrides it (built-in
 defaults < harness-default < file < env). The guard fields have **no explicit
-`load()` kwargs** in v0.2 (only `harness` is passed); if an explicit per-field
+`load()` kwargs** in this release (only `harness` is passed); if an explicit per-field
 override is needed later it will be added with its own review.
 
 `health_probe` (default `true`) controls whether a tripped circuit-breaker

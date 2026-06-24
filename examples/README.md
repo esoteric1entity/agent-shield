@@ -20,7 +20,7 @@ Worked examples for the three most common integration patterns.
 cp ~/.claude/settings.json ~/.claude/settings.json.bak
 
 # Append the two PreToolUse entries into your existing hooks.PreToolUse array
-# (create hooks/hooks.PreToolUse only if absent; do NOT replace them).
+# (create hooks.PreToolUse only if absent; do NOT replace them).
 # See claude-code-settings.example.json for the exact structure
 
 # Restart Claude Code — it picks up the new hooks on next session
@@ -56,7 +56,15 @@ cp ~/.claude/settings.json ~/.claude/settings.json.bak
 # 3. Restart Claude Code so it reloads settings without the hooks
 ```
 
-**For OpenClaw and other harnesses:** the same principle applies — remove the guard's hook entry from that harness's configuration and restart the session. The exact mechanism is harness-specific (see your harness's settings docs); the unwire-then-restart pattern is the same.
+**For OpenClaw:** uninstall the old companion plugin using the mechanism your OpenClaw version documents, then restart the gateway. The exact command is version-specific; see [`docs/MIGRATION.md`](../docs/MIGRATION.md) for the legacy-vs-canonical shape and [`docs/adapter_status.md`](../docs/adapter_status.md) for the verified install recipe.
+
+**For other harnesses:** the same principle applies — remove the guard's hook entry from that harness's configuration and restart the session. The exact mechanism is harness-specific (see your harness's settings docs); the unwire-then-restart pattern is the same.
+
+## Legacy migration
+
+If you wired agent-shield during an earlier alpha, your settings may use a
+non-functional legacy shape. See [`docs/MIGRATION.md`](../docs/MIGRATION.md) for
+legacy-to-canonical migration steps for Claude Code and OpenClaw.
 
 ## What's NOT in examples
 

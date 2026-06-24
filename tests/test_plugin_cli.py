@@ -100,7 +100,7 @@ def test_disable_removes_only_agent_entries(tmp_settings):
 
 
 def test_disable_removes_legacy_entries(tmp_settings):
-    """Early v0.2 alphas wrote the wrong shape; disable must clean them up."""
+    """Early alphas wrote the wrong shape; disable must clean them up."""
     existing = {
         "hooks": {
             "PreToolUse": [
@@ -115,6 +115,57 @@ def test_disable_removes_legacy_entries(tmp_settings):
     assert plugin_cli.main(["disable", "--force"]) == 0
     data = _settings_json(tmp_settings)
     assert "hooks" not in data
+
+
+def test_disable_removes_legacy_entries_with_extra_keys(tmp_settings):
+    """Customised legacy variants (extra keys, different toolNamePattern) must still be removed."""
+    existing = {
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "hookEventName": "PreToolUse",
+                    "toolNamePattern": "Bash|CustomTool",
+                    "command": "python -m agent_shield.adapters.claude_code",
+                    "enabled": True,
+                },
+                {
+                    "hookEventName": "PreToolUse",
+                    "toolNamePattern": "Write|Edit|MultiEdit|BatchEdit",
+                    "command": "python -m agent_shield.adapters.claude_code",
+                    "timeout": 5,
+                },
+            ]
+        }
+    }
+    tmp_settings.parent.mkdir(parents=True, exist_ok=True)
+    tmp_settings.write_text(json.dumps(existing), encoding="utf-8")
+
+    assert plugin_cli.main(["disable", "--force"]) == 0
+    data = _settings_json(tmp_settings)
+    assert "hooks" not in data
+
+
+def test_disable_preserves_non_agent_hook_with_hookeventname(tmp_settings):
+    """A non-agent hook that happens to use hookEventName must not be deleted."""
+    existing = {
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "hookEventName": "PreToolUse",
+                    "toolNamePattern": "SomeOtherTool",
+                    "command": "python -m some_other_guard",
+                },
+            ]
+        }
+    }
+    tmp_settings.parent.mkdir(parents=True, exist_ok=True)
+    tmp_settings.write_text(json.dumps(existing), encoding="utf-8")
+
+    assert plugin_cli.main(["disable", "--force"]) == 0
+    data = _settings_json(tmp_settings)
+    entries = data["hooks"]["PreToolUse"]
+    assert len(entries) == 1
+    assert entries[0]["command"] == "python -m some_other_guard"
 
 
 def test_status_enabled(tmp_settings):
