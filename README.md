@@ -82,11 +82,11 @@ Wire it into `~/.claude/settings.json` (the **module form** below — `python -m
     "PreToolUse": [
       {
         "matcher": "Bash",
-        "hooks": [{"type": "command", "command": "python -m agent_shield.bash_guard"}]
+        "hooks": [{"type": "command", "command": "python -m agent_shield.bash_guard", "timeout": 5}]
       },
       {
         "matcher": "Write|Edit|MultiEdit",
-        "hooks": [{"type": "command", "command": "python -m agent_shield.write_guard"}]
+        "hooks": [{"type": "command", "command": "python -m agent_shield.write_guard", "timeout": 5}]
       }
     ]
   }
@@ -127,7 +127,7 @@ Every check returns a `GuardResult` with one of three decisions:
 ### `bash_guard.check_command(cmd)` — patterns
 
 - **24 RED patterns**: destructive filesystem ops — `rm -rf` against root / home / cwd targets, including quoted (`rm -rf "/"`), split-flag (`rm -r -f /`), and bundled / reordered / intervening-flag (`rm -rfv /`, `rm -fvr /`, `rm -rf -- /`) forms, `--no-preserve-root`, `mkfs.*`, `format X:` / `wipefs`, `dd` onto block devices, fork bombs; remote-code execution — pipe-to-shell (`curl … | bash`), pipe-to-source, decode-and-execute (`base64 -d | sh`), process substitution (`bash <(curl …)`), encoded PowerShell; credential exfiltration — `$VAR` / `${VAR}` secrets in network commands, uploading secret files (`curl -d @id_rsa`), piping secret files to network tools.
-- **11 YELLOW patterns**: recursive force-deletes off-root (`rm -rf`, split-flag form, Windows `del /s`, `Remove-Item -Recurse -Force`, `shred`); network uploads; destructive git operations; package installs; `chmod 777`; Windows registry edits; service/process control.
+- **12 YELLOW patterns**: recursive force-deletes off-root (`rm -rf`, split-flag form, Windows `del /s`, `Remove-Item -Recurse -Force`, `shred`); network uploads; destructive git operations; package installs; `chmod 777`; Windows registry edits; service/process control; disabling the agent-shield runtime guard (`agent-shield-plugin disable`, `python -m agent_shield.plugin_cli disable`, and shell-wrapped forms).
 - **GREEN is not a pattern list** — it is the default: anything not matched by a RED or YELLOW pattern passes silently. There is no allowlist.
 
 ### `write_guard.check_path(file_path)` — patterns
@@ -363,7 +363,7 @@ Four suites: Python guard/CLI tests, bash-subprocess equivalence, a bash-native 
 ## Troubleshooting
 
 - **`ModuleNotFoundError: No module named 'agent_shield'`** — the hook/CLI is running under a different Python than the one agent-shield is installed in. Activate the right venv, or point the hook at that interpreter (e.g. `/path/to/venv/bin/python -m agent_shield.bash_guard`).
-- **`ModuleNotFoundError: No module named 'agent_shield'` *after uninstalling*** — `pip uninstall` removed the package, but the two `PreToolUse` hook entries are still in your `settings.json`, so every tool call now fails. Remove the agent-shield `Bash` and `Write|Edit|MultiEdit` entries from `~/.claude/settings.json` (or the project `.claude/settings.json`) and restart. Full steps: [`INSTALL_AGENT.md`](INSTALL_AGENT.md) Step 6.
+- **`ModuleNotFoundError: No module named 'agent_shield'` *after uninstalling*** — `pip uninstall` removed the package, but the two `PreToolUse` hook entries are still in your `settings.json`, so every tool call now fails. If the `agent-shield-plugin` command is still available, run it first: `agent-shield-plugin disable` (or `agent-shield-plugin --project <dir> disable`) to remove them safely. If the CLI is gone because the package was already uninstalled, manually edit the file and remove the two `PreToolUse` entries for `Bash` and `Write|Edit|MultiEdit` that call `agent_shield.bash_guard` / `agent_shield.write_guard`. Then restart. Full steps: [`INSTALL_AGENT.md`](INSTALL_AGENT.md) Step 6.
 - **A safe command produces no output** — that's correct: `allow` is a silent pass (empty stdout, exit 0). Test with a known-bad command (`echo '{"tool_input":{"command":"rm -rf /"}}' | python -m agent_shield.bash_guard`) to see a `deny`.
 - **Hooks don't take effect in Claude Code** — restart the session after editing `settings.json`; hooks are read at startup.
 - **Windows: the bash-parity tests are slow or skip** — the suite resolves Git-Bash/Cygwin explicitly (never the WSL `bash.exe` shim) and skips cleanly if no POSIX bash is found; set `AGENT_SHIELD_TEST_BASH` to a specific `bash.exe` to override. The runtime guards are pure Python and need no bash.

@@ -104,18 +104,29 @@ now-removed guard makes **every** tool call fail with
 `ModuleNotFoundError: No module named 'agent_shield'` on the next session. Always do both,
 in order:
 
-1. **Remove the package:** `pip uninstall -y agent-shield` (in the environment it was
+1. **Un-wire the hooks (only if you wired them in Step 3).** Use the CLI helper:
+   ```bash
+   agent-shield-plugin disable
+   # or, for a project-level settings file:
+   agent-shield-plugin --project <dir> disable
+   ```
+   This removes the two agent-shield `PreToolUse` entries from `~/.claude/settings.json`
+   (or the project `.claude/settings.json`). It creates a timestamped backup and preserves
+   all unrelated hooks. **Show the user the before/after diff and get consent before writing.**
+   If `hooks.PreToolUse` is left empty, an empty array or removing the key are both valid.
+
+   The CLI requires an interactive terminal for `disable`; in non-TTY environments pass
+   `--force` only after explicit user confirmation.
+2. **Remove the package:** `pip uninstall -y agent-shield` (in the environment it was
    installed into). Confirm with `pip show agent-shield` → no output.
-2. **Un-wire the hooks (only if you wired them in Step 3).** Read the settings file
-   (`~/.claude/settings.json`, or the project `.claude/settings.json`) and **remove the two
-   `PreToolUse` entries** agent-shield added — the `Bash` → `python -m agent_shield.bash_guard`
-   entry and the `Write|Edit|MultiEdit` → `python -m agent_shield.write_guard` entry.
-   **Show the user the before/after diff and get consent before writing.** Remove **only**
-   those two entries; never touch unrelated hooks. If `hooks.PreToolUse` is left empty, an
-   empty array or removing the key are both valid.
 3. **Restart** the harness session so it reloads settings without the hooks.
 
-Skipping step 2 leaves stale hook references that break all `Bash`/`Write`/`Edit` operations
+**Already uninstalled the package first?** If `agent-shield-plugin` is no longer on
+`PATH`, manually edit `~/.claude/settings.json` (or the project `.claude/settings.json`)
+and remove the two `PreToolUse` entries that invoke `agent_shield.bash_guard` and
+`agent_shield.write_guard`. Then restart the harness session.
+
+Skipping step 1 leaves stale hook references that break all `Bash`/`Write`/`Edit` operations
 until they are removed — see the **Troubleshooting** entry in `README.md`.
 
 ---

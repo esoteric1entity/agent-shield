@@ -9,7 +9,8 @@ config should be allowed through on the error path.
 Allowed classes:
   - pip/uv install/uninstall/upgrade of the literal ``agent-shield`` package
     (or ``pip install -e <path-containing-agent-shield>``)
-  - ``agent-shield plugin enable|disable``
+  - ``agent-shield-plugin enable|disable``
+  - ``python -m agent_shield.plugin_cli enable|disable``
   - location probes: ``which agent-shield``, ``command -v agent-shield``,
     ``where agent-shield``
   - Write/Edit paths under ``~/.agent-shield/``, ``/opt/agent-shield/``,
@@ -42,14 +43,28 @@ from agent_shield import _self_lockout_allowlist as allowlist
     "pip install -e ./agent-shield",
     "pip install -e /home/user/agent-shield",
     "pip3 install -e ./agent-shield",
+    "pip install agent-shield==1.0.0",
+    "pip3 install agent-shield[extra]",
+    "pip install agent-shield[extra]==1.0.0",
     "pip uninstall agent-shield",
     "pip3 uninstall agent-shield",
     "pipx uninstall agent-shield",
     "uv uninstall agent-shield",
     "pip install --upgrade agent-shield",
     "pip upgrade agent-shield",
-    "agent-shield plugin enable",
-    "agent-shield plugin disable",
+    "pip upgrade agent-shield==1.0.0",
+    "pip3 uninstall agent-shield[extra]",
+    "pip install --upgrade agent-shield[dev]",
+    "uv pip install agent-shield",
+    "uv pip install agent-shield==1.0.0",
+    "uv pip install agent-shield[extra]",
+    "uv pip install --upgrade agent-shield",
+    "agent-shield-plugin enable",
+    "agent-shield-plugin disable",
+    "python -m agent_shield.plugin_cli enable",
+    "python -m agent_shield.plugin_cli disable",
+    "python3 -m agent_shield.plugin_cli enable",
+    "python3 -m agent_shield.plugin_cli disable",
     "which agent-shield",
     "command -v agent-shield",
     "where agent-shield",
@@ -110,6 +125,14 @@ def test_exact_directory_path_is_allowed():
     # Malicious shell games
     "bash -c 'agent-shield plugin enable; rm -rf /'",
     "pip install agent-shield; rm -rf /",
+    # Flag-bearing plugin commands must NOT be allowlisted (they bypass TTY confirmation)
+    "agent-shield-plugin disable --force",
+    "agent-shield-plugin disable --force --project .",
+    "agent-shield-plugin --force disable",
+    "agent-shield-plugin --project . disable",
+    "python -m agent_shield.plugin_cli disable --force",
+    "python -m agent_shield.plugin_cli disable --project .",
+    "python -m agent_shield.plugin_cli --project . disable",
     # Missing command entirely
     "pip install",
     "pip uninstall",

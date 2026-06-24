@@ -394,6 +394,24 @@ _YELLOW_PATTERNS: Final[tuple[tuple[re.Pattern[str], str], ...]] = (
         re.compile(r"(net\s+stop|taskkill|sc\s+delete)", _FLAGS),
         "System service/process manipulation",
     ),
+    # Disabling the agent-shield runtime guard — must never be silent.
+    # Matches the console script and the real module form, even when wrapped
+    # inside bash -c / eval / xargs or quoted. Tolerates interspersed options
+    # (e.g. ``--project DIR``) between the program name and ``disable``.
+    # Disabling the agent-shield runtime guard — must never be silent.
+    # Uses a single contiguous regex (not staged search) to keep Python/bash
+    # parity exact: the program must be at command position, followed by option
+    # tokens, then the literal subcommand ``disable``. Quoted subcommands and
+    # common interpreter spellings (python3.11, python.exe, py) are caught.
+    (
+        re.compile(
+            _CMD_START
+            + r"(agent-shield-plugin|(python(?:3(\.\d+)?|\.exe)?|py)\s+-m\s+agent_shield\.plugin_cli)\s+"
+            + r"(?:\S+\s+)*['\"]?disable['\"]?\b",
+            _FLAGS_ML,
+        ),
+        "Disabling agent-shield runtime guard — confirm intentional",
+    ),
 )
 
 

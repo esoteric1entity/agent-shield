@@ -38,6 +38,7 @@ agent-shield-bash-guard = "agent_shield.bash_guard:main"
 agent-shield-write-guard = "agent_shield.write_guard:main"
 agent-shield-vet = "agent_shield.skill_vetting:main"
 agent-shield-openclaw-guard = "agent_shield.adapters.openclaw:main"
+agent-shield-plugin = "agent_shield.plugin_cli:main"
 
 [project.urls]
 Homepage = "https://github.com/esoteric1entity/agent-shield"

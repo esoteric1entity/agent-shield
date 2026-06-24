@@ -38,6 +38,25 @@ cfg = config.load()
 log = audit.AuditLog(path=cfg.audit.path, preset=cfg.compliance)   # explicit
 ```
 
+## Hook wiring helper (v0.2)
+
+For Claude Code, install and remove the `PreToolUse` hooks without hand-editing
+``~/.claude/settings.json``:
+
+```bash
+agent-shield-plugin enable              # install the hooks
+agent-shield-plugin status              # check whether they are present
+agent-shield-plugin disable             # remove them (interactive TTY prompt)
+agent-shield-plugin disable --force     # remove them in non-TTY/script contexts
+agent-shield-plugin --project ./myproj enable    # use project-level settings
+agent-shield-plugin --project ./myproj disable   # remove project-level hooks
+```
+
+The helper creates a timestamped backup before mutating the file, preserves
+unrelated hooks, and supports both user-level ``~/.claude/settings.json`` and
+project-level ``.claude/settings.json``. The ``disable`` command requires an
+interactive terminal unless ``--force`` is explicitly passed.
+
 `Config` reflects the **declared** policy as resolved by `load()`. An explicit
 keyword passed *directly* to a layer constructor wins at that layer and is **not**
 reflected back into `Config` — so pass the slice rather than mixing config and

@@ -253,6 +253,17 @@ elif echo "$CMD" | grep -qEi '(reg\s+(add|delete)|regedit)'; then
 # Service/process manipulation
 elif echo "$CMD" | grep -qEi '(net\s+stop|taskkill|sc\s+delete)'; then
     ASK_REASON="System service/process manipulation"
+
+# Disabling the agent-shield runtime guard — must never be silent.
+# Matches the console script and the real module form, even when wrapped
+# inside bash -c / eval / xargs or quoted. Tolerates interspersed options
+# (e.g. ``--project DIR``) between the program name and ``disable``.
+# Disabling the agent-shield runtime guard — must never be silent.
+# Mirrors agent_shield/bash_guard.py: program at command position, any
+# interspersed tokens, then the literal subcommand ``disable`` (optionally
+# quoted). Catches python3.11, python.exe, and the Windows ``py`` launcher.
+elif echo "$CMD" | grep -qEi "${CMD_START}(agent-shield-plugin|(python(3(\.[0-9]+)?|\.exe)?|py)[[:space:]]+-m[[:space:]]+agent_shield\.plugin_cli)[[:space:]]+([^[:space:]]+[[:space:]]+)*['\"]?disable['\"]?\b"; then
+    ASK_REASON="Disabling agent-shield runtime guard — confirm intentional"
 fi
 
 if [ -n "$ASK_REASON" ]; then

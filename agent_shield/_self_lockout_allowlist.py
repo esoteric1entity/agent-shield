@@ -19,28 +19,33 @@ import os
 from agent_shield import write_guard
 
 #: Repair/reinstall package commands. The package name must be the LITERAL
-#: ``agent-shield`` token (no prefix/suffix), OR an editable install whose
-#: FINAL path segment is ``agent-shield``. Flags may appear between the verb
-#: and the package name.
+#: ``agent-shield`` token (with optional extras and/or version specifier), OR
+#: an editable install whose FINAL path segment is ``agent-shield``. Flags may
+#: appear between the verb and the package name.
 _ALLOWED_INSTALL_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(
-        r"^\s*(pip|pip3|pipx|uv)\s+install\s+(?:--?\S+\s+)*-e\s+(?:.*[/\\])?agent-shield/?\s*$",
-
+        r"^\s*(pip|pip3|pipx|uv(?:\s+pip)?)\s+install\s+(?:--?\S+\s+)*-e\s+(?:.*[/\\])?agent-shield/?\s*$",
         re.IGNORECASE,
     ),
     re.compile(
-        r"^\s*(pip|pip3|pipx|uv)\s+install\s+(?:--?\S+\s+)*agent-shield\s*$",
+        r"^\s*(pip|pip3|pipx|uv(?:\s+pip)?)\s+install\s+(?:--?\S+\s+)*agent-shield(?:\[[^\]]+\])?(?:==[^\s]+)?(?:\[[^\]]+\])?\s*$",
         re.IGNORECASE,
     ),
     re.compile(
-        r"^\s*(pip|pip3|pipx|uv)\s+(?:uninstall|upgrade)\s+(?:--?\S+\s+)*agent-shield\s*$",
+        r"^\s*(pip|pip3|pipx|uv(?:\s+pip)?)\s+(?:uninstall|upgrade)\s+(?:--?\S+\s+)*agent-shield(?:\[[^\]]+\])?(?:==[^\s]+)?(?:\[[^\]]+\])?\s*$",
         re.IGNORECASE,
     ),
 )
 
 #: agent-shield subcommand surface used to enable/disable the plugin/hook.
+#: Only the base enable/disable verbs are allowed; flag-bearing variants
+#: (e.g. ``--force``) are deliberately denied.
 _ALLOWED_PLUGIN_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"^\s*agent-shield\s+plugin\s+(enable|disable)\s*$", re.IGNORECASE),
+    re.compile(r"^\s*agent-shield-plugin\s+(enable|disable)\s*$", re.IGNORECASE),
+    re.compile(
+        r"^\s*python(3|\.exe)?\s+-m\s+agent_shield\.plugin_cli\s+(enable|disable)\s*$",
+        re.IGNORECASE,
+    ),
 )
 
 #: Diagnostic location probes.
