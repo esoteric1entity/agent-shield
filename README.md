@@ -5,7 +5,7 @@
 > *A **PDuk Brainworks** project. Sibling to the [Ultimate Memory Stack](https://github.com/esoteric1entity/ultimate-memory-stack). Apache-2.0.*
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Status: alpha](https://img.shields.io/badge/Status-v0.1.0a5_alpha-yellow.svg)](#project-status)
+[![Status: alpha](https://img.shields.io/badge/Status-v0.2.0_alpha-yellow.svg)](#project-status)
 [![Python: ≥3.11](https://img.shields.io/badge/Python-%E2%89%A53.11-green.svg)](pyproject.toml)
 [![Tests](https://github.com/esoteric1entity/agent-shield/actions/workflows/test.yml/badge.svg)](https://github.com/esoteric1entity/agent-shield/actions/workflows/test.yml)
 
@@ -15,7 +15,7 @@
 
 `agent-shield` is a layered defensive overlay for AI agents. It intercepts what your agent is about to do — run a command or write a file — and applies a tiered RED / YELLOW / GREEN decision policy before letting it through. (Network egress — fetching a URL — is the roadmap Layer 5, not yet shipped.)
 
-v0.1.0 ships **six of the eight layers** — Layers 1, 2, 3, 4, 6, and 7 (see [The 8 layers](#the-8-layers) and [Project status](#project-status)):
+v0.2.0 ships **six of the eight layers** — Layers 1, 2, 3, 4, 6, and 7 (see [The 8 layers](#the-8-layers) and [Project status](#project-status)):
 
 - **Layer 4 — Runtime Hooks** is the headline runtime surface. It runs on a **harness-agnostic architecture** (one neutral decision core, per-harness adapters) with two functional adapters shipping today: **Claude Code** (via PreToolUse hook; CI-verified) and **OpenClaw** (via `before_tool_call`; live but enforcement requires a recent gateway — see [`docs/adapter_status.md`](docs/adapter_status.md)). Additional harnesses (Codex, Gemini, Copilot, etc.) are roadmap.
   - **`bash_guard`** — inspects bash commands before execution
@@ -112,13 +112,13 @@ across harnesses.
 | # | Layer | What it does | Status |
 |---|---|---|---|
 | 0 | Operational + Automation | Cron schedule for hygiene tasks (audit / key / log rotation) | 🟡 pre-release |
-| 1 | **Skill / Tool Vetting** | **`skill_vetting`** — static read-only scan → 3-tier verdict (approved/review/rejected); 5-layer manual escalation for the review tier | ✅ **v0.1.0** |
-| 2 | **Input Sanitization** | **`sanitize`** — 4-layer (structural strip · content flag · encoding detect · nonce-delimited context wrap) for untrusted incoming content | ✅ **v0.1.0** |
-| 3 | **Structured Output** | **`structured_output`** — enforce a declared schema (shape, not content/intent) + reject prose-wrapped JSON | ✅ **v0.1.0** |
-| 4 | **Runtime Hooks** | **`bash_guard` + `write_guard`** | ✅ **v0.1.0** |
+| 1 | **Skill / Tool Vetting** | **`skill_vetting`** — static read-only scan → 3-tier verdict (approved/review/rejected); 5-layer manual escalation for the review tier | ✅ **v0.2.0** |
+| 2 | **Input Sanitization** | **`sanitize`** — 4-layer (structural strip · content flag · encoding detect · nonce-delimited context wrap) for untrusted incoming content | ✅ **v0.2.0** |
+| 3 | **Structured Output** | **`structured_output`** — enforce a declared schema (shape, not content/intent) + reject prose-wrapped JSON | ✅ **v0.2.0** |
+| 4 | **Runtime Hooks** | **`bash_guard` + `write_guard`** | ✅ **v0.2.0** |
 | 5 | Network Egress | URL allowlist + Ollama proxy + rate limiting | 🟡 pre-release |
-| 6 | **Structured Audit** | **`audit`** — append-only JSONL + SHA-256 hash-chain (tamper-evident), `verify()` + `--verify` CLI, optional external anchor (local-path / bring-your-own-shipper — **never phones home**) | ✅ **v0.1.0** |
-| 7 | **Configuration** | **`config`** — TOML loader + compliance presets + the shared cross-layer contract; never-crash, opt-in wiring | ✅ **v0.1.0** |
+| 6 | **Structured Audit** | **`audit`** — append-only JSONL + SHA-256 hash-chain (tamper-evident), `verify()` + `--verify` CLI, optional external anchor (local-path / bring-your-own-shipper — **never phones home**) | ✅ **v0.2.0** |
+| 7 | **Configuration** | **`config`** — TOML loader + compliance presets + the shared cross-layer contract; never-crash, opt-in wiring | ✅ **v0.2.0** |
 
 ---
 
@@ -243,7 +243,7 @@ so.extract_json(text)     # pull the first JSON object out of surrounding text
 
 - **Type matching is by exact identity** (not `isinstance`): an `int` field rejects `True`/`False` (bool is not int), a `bool` field rejects `0`/`1`; `int` widens to `float` (JSON has no `1` vs `1.0`); `NaN`/`Infinity` are rejected. Supports nested `Schema`, `list[T]`, `dict[str, T]`, `Union`/`Optional`, `Literal`, `(type, default)` optionals, and `Field(...)` constraints (length / numeric range / regex / choices).
 - **Collect-all, deterministic errors** in schema-declared order; **strict** rejects unexpected keys, **lenient** drops them; `value` is a fresh dict and `enforce` never mutates its input.
-- **Canary tokens and pydantic interop are deferred to future releases.** v0.1 ships a stdlib-only validator.
+- **Canary tokens and pydantic interop are deferred to future releases.** v0.2.0 ships a stdlib-only validator.
 
 Full DSL grammar, the type rules, strict/lenient + default-fill, the JSON-discipline helpers, and bypasses & limitations: [`docs/STRUCTURED_OUTPUT.md`](docs/STRUCTURED_OUTPUT.md).
 
@@ -282,7 +282,7 @@ log = audit.AuditLog("audit.jsonl",
 
 The anchor periodically (every N entries or T minutes — never per-event) copies a minimal receipt — `{seq, entry_hash, ts}`, no PII — to its target, fail-open: a *failing* shipper never blocks the audited write. **Resistance holds only when that target is genuinely independent** — a separate / write-once volume or another host; an anchor on the **same volume** as the log is not independent and stays tamper-evident only. The log file is written `0600` and is a **forensic** record, not a live guard. Retention/rotation enforcement is not automated in this release.
 
-**agent-shield never phones home.** The shipped package makes **no outbound network calls** — its only socket use is a local `gethostname()` for the audit machine field, and the built-in anchor writes to a local path only. To anchor off-box, you **bring your own shipper** (a callable that transmits the receipt however you choose); the egress is your code and your policy. There is no `url`/`endpoint` parameter, and the no-network guarantee is checked by a best-effort AST lint in the test suite (not a sandbox). Your shipper runs **synchronously, in-process** and cannot be timed out in v0.1 — keep it fast, or do slow/network work asynchronously yourself. A ready-to-copy recipe and a full risk guide live in [`examples/remote_anchor_shipper.py`](examples/remote_anchor_shipper.py) and [`docs/REMOTE_ANCHORING.md`](docs/REMOTE_ANCHORING.md).
+**agent-shield never phones home.** The shipped package makes **no outbound network calls** — its only socket use is a local `gethostname()` for the audit machine field, and the built-in anchor writes to a local path only. To anchor off-box, you **bring your own shipper** (a callable that transmits the receipt however you choose); the egress is your code and your policy. There is no `url`/`endpoint` parameter, and the no-network guarantee is checked by a best-effort AST lint in the test suite (not a sandbox). Your shipper runs **synchronously, in-process** and cannot be timed out in v0.2.0 — keep it fast, or do slow/network work asynchronously yourself. A ready-to-copy recipe and a full risk guide live in [`examples/remote_anchor_shipper.py`](examples/remote_anchor_shipper.py) and [`docs/REMOTE_ANCHORING.md`](docs/REMOTE_ANCHORING.md).
 
 Full field reference, verification procedure, and limits: [`docs/AUDIT_SCHEMA.md`](docs/AUDIT_SCHEMA.md).
 
@@ -305,9 +305,9 @@ log = audit.AuditLog(path=cfg.audit.path, preset=cfg.compliance)   # opt-in wiri
 ```
 
 - **Never-crash.** A missing / malformed / mistyped / oversized / unknown-preset config degrades to built-in defaults with a surfaced `UserWarning` — a layer always runs with zero config.
-- **Preset parity.** Compliance presets mirror `audit.PRESETS` **exactly** (`general`/`healthcare`/`biotech`), single-sourced — an unknown/typo'd preset can never reach `AuditLog`. There is **no `enterprise` preset** in v0.1.0; it is planned for v0.2.
+- **Preset parity.** Compliance presets mirror `audit.PRESETS` **exactly** (`general`/`healthcare`/`biotech`), single-sourced — an unknown/typo'd preset can never reach `AuditLog`. There is **no `enterprise` preset** in v0.2.0; it is planned for a future release.
 - **Precedence:** built-in defaults < config file < environment < explicit kwargs. The file is found by search (first existing wins): `$AGENT_SHIELD_CONFIG` → `./agent-shield.toml` → `~/.agent-shield/config.toml`. The config file is a `write_guard` **YELLOW** target. **TOML only** (stdlib `tomllib`); YAML is rejected (dependency + `yaml.load` footgun).
-- **Opt-in wiring** in v0.1 — the guards don't auto-load config (no hot-path I/O); callers pass slices. Pattern add-ons (`extra_red`/`extra_yellow`) are deferred to v0.2.
+- **Opt-in wiring** in v0.2.0 — the guards don't auto-load config (no hot-path I/O); callers pass slices. Pattern add-ons (`extra_red`/`extra_yellow`) are deferred to a post-v0.2.0 release.
 
 Schema, every key, the presets, search-path + precedence, env vars, and bypasses & limitations: [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
 
@@ -361,7 +361,7 @@ python tests/run_equivalence_test.py
 
 Four suites: Python guard/CLI tests, bash-subprocess equivalence, a bash-native harness, and a head-to-head equivalence runner. All must be green before a release is tagged; run them rather than trusting a number printed here. CI runs the full suite on Linux, macOS, and Windows (Python 3.11–3.14); platforms outside that matrix (e.g. BSD) aren't verified.
 
-**Quality process.** agent-shield is AI-assisted by design — built with AI agents under human architectural direction — and engineered accordingly: changes are developed test-first (red → green) and must pass all four suites before a release is tagged. Releases additionally go through an independent adversarial review pass, with reviewers tasked to break the changes rather than approve them — for v0.1.0 that pass uncovered issues in early hardening attempts, which were corrected and re-verified before shipping. Platform note: the bash-subprocess pytest cases shell out to bash. On Windows the harness resolves Git-Bash/Cygwin explicitly and never the WSL `bash.exe` shim — Python's `subprocess` otherwise mis-resolves a bare `bash` to that shim (Win32 searches `System32` before `PATH`), and it hangs when driven from native-Windows Python. So the parity cases now run on Windows too; if no usable bash is found they skip with a clear reason instead of hanging. Set `AGENT_SHIELD_TEST_BASH` to a specific `bash.exe` to override resolution.
+**Quality process.** agent-shield is AI-assisted by design — built with AI agents under human architectural direction — and engineered accordingly: changes are developed test-first (red → green) and must pass all four suites before a release is tagged. Releases additionally go through an independent adversarial review pass, with reviewers tasked to break the changes rather than approve them — for v0.2.0 that pass uncovered issues in early hardening attempts, which were corrected and re-verified before shipping. Platform note: the bash-subprocess pytest cases shell out to bash. On Windows the harness resolves Git-Bash/Cygwin explicitly and never the WSL `bash.exe` shim — Python's `subprocess` otherwise mis-resolves a bare `bash` to that shim (Win32 searches `System32` before `PATH`), and it hangs when driven from native-Windows Python. So the parity cases now run on Windows too; if no usable bash is found they skip with a clear reason instead of hanging. Set `AGENT_SHIELD_TEST_BASH` to a specific `bash.exe` to override resolution.
 
 ---
 
@@ -451,7 +451,7 @@ agent-shield is a security tool from an independent author — so it's built to 
 
 ## Project status
 
-**v0.1.0 alpha** — Layers 1, 2, 3, 4, 6, and 7 ship. Layers 0 and 5 are in active development. **Python 3.11+** (LTS); tomllib stdlib → zero external deps. Layer 4 runs on a harness-agnostic architecture: one neutral decision core with two functional adapters today — Claude Code (CI-verified) and OpenClaw (live; enforcement requires a recent gateway — see [`docs/adapter_status.md`](docs/adapter_status.md)). Additional harnesses are roadmap.
+**v0.2.0 alpha** — Layers 1, 2, 3, 4, 6, and 7 ship. Layers 0 and 5 are in active development. **Python 3.11+** (LTS); tomllib stdlib → zero external deps. Layer 4 runs on a harness-agnostic architecture: one neutral decision core with two functional adapters today — Claude Code (CI-verified) and OpenClaw (live; enforcement requires a recent gateway — see [`docs/adapter_status.md`](docs/adapter_status.md)). Additional harnesses are roadmap.
 
 | Item | Status |
 |---|---|

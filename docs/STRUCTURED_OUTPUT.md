@@ -117,12 +117,12 @@ Both return an `EnforceResult` (never raise).
 
 ---
 
-## Deferred to v0.2 (documented, not built)
+## Deferred to post-v0.2.0 (documented, not built)
 
 - **Canary tokens** — a secret planted in the system prompt + a leak-check on every
   response — need a runtime hook into the model's **response stream**
-  (harness/version-dependent), so they are **deferred to v0.2**. The shipped Layer 3
-  enforces output *shape*; the canary is not part of v0.1.
+  (harness/version-dependent), so they are **deferred to a post-v0.2.0 release**.
+  The shipped Layer 3 enforces output *shape*; the canary is not part of v0.2.0.
 - **pydantic interop** — accepting a caller-supplied pydantic model (duck-typed) is
   a sanctioned future option; v0.1 ships the **stdlib** validator only and imports
   no third-party package.

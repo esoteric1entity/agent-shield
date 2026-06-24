@@ -48,7 +48,7 @@ The shipped directory contains:
   (`missing register/activate export`) → no enforcement. `tests/test_openclaw_plugin_shape.py`
   pins this shape so the no-op cannot regress.
 - `openclaw.plugin.json` — `{ "id": "agent-shield", "name": "agent-shield", "enabledByDefault": true, "configSchema": { "type": "object", "additionalProperties": false, "properties": {} } }`
-- `package.json` — `{ "name": "agent-shield", "version": "0.1.0a5", "type": "module", "openclaw": { "extensions": ["./index.ts"] } }` — the `openclaw.extensions` key is **required** (without it the install falls back to the hook-pack path and errors on a missing `HOOK.md`).
+- `package.json` — `{ "name": "agent-shield", "version": "0.2.0", "type": "module", "openclaw": { "extensions": ["./index.ts"] } }` — the `openclaw.extensions` key is **required** (without it the install falls back to the hook-pack path and errors on a missing `HOOK.md`).
 
 The adapter and shared core are covered by `tests/test_adapter_openclaw.py` + the cross-adapter
 equivalence test; the directory install contract above by `tests/test_openclaw_plugin_shape.py`.

@@ -114,9 +114,21 @@ ENV_KEYS = {
     "AGENT_SHIELD_HEALTH_PROBE": "guard.health_probe",
 }
 
+def _strict_sanitize_presets() -> frozenset[str]:
+    """Derive the strict-sanitize preset set from the single-source audit table.
+
+    This closes a forward-compat gap: a future high-posture preset only needs to
+    set ``sanitize_strict = True`` in ``audit.PRESETS``; config automatically
+    honors it without a second hard-coded list.
+    """
+    from agent_shield import audit  # single-sourced from the audit table
+
+    return frozenset({name for name, spec in audit.PRESETS.items() if spec.get("sanitize_strict")})
+
+
 #: Compliance tiers that tighten input sanitization by default. A subset of the
 #: audit preset names (pinned by test); an unlisted preset defaults to non-strict.
-STRICT_SANITIZE_COMPLIANCE = frozenset({"healthcare", "biotech"})
+STRICT_SANITIZE_COMPLIANCE = _strict_sanitize_presets()
 
 #: Compliance tiers that FORCE ``guard.error_policy = "closed"`` at the TOP of
 #: precedence — above the harness-default, the config file, the env var, and any

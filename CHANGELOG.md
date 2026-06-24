@@ -36,15 +36,26 @@ per-finding engineering notes are kept in the project's internal records.
 
 ## [Unreleased]
 
-### Deferred to v0.2
-Triaged as polish rather than blockers; deferred so each gets its own design and test pass:
-- **L1 `ENV_BULK`** — also flag bulk `process.env` / `os.environ` reads (`Object.entries(process.env)`, `{...process.env}`, `os.environ.items()/values()/keys()`).
-- **L1 typosquat scope** — extend manifest coverage beyond `requirements.txt` / `package.json` (e.g. `pyproject.toml`, `setup.py`, `Pipfile`, `environment.yml`) and/or allow edit-distance ≤ 2.
-- **L6 egress AST lint** — also track `os` aliases, `from os import …`, `__import__`, and `importlib`.
-- **L6 `Anchor` zero-cadence footgun** — warn (or raise) when both `every_n=0` and `every_minutes=0` but a sink/shipper is supplied (anchoring is silently disabled).
-- **L7 `STRICT_SANITIZE_COMPLIANCE`** — derive sanitize strictness from a preset attribute, to close a forward-compat gap for a future high-posture preset.
-- **Packaging** — a PEP-562 module `__getattr__` so `agent_shield.bash_guard` resolves after a bare `import agent_shield` while keeping the no-eager-import property.
-- **L1 `skill_vetting` walker DoS hardening** — bound symlink / junction traversal to the target tree and add an aggregate file-count / total-byte budget so a hostile package can't soft-DoS the scan. (The vetter is a deliberately-invoked CLI, not an automated input path, so it is bounded-priority — it warrants its own design + test pass rather than a pre-flip change.)
+## [0.2.0] — 2026-06-23 — deferred items + release readiness
+
+### Added
+- **L1 `ENV_BULK` expansion.** Skill vetter now flags additional bulk environment reads: `Object.entries(process.env)`, `{...process.env}`, `os.environ.items()/values()/keys()`, and `list/tuple/set(os.environ)`.
+- **L1 typosquat manifest scope extension.** Typosquat detection now covers `pyproject.toml`, `setup.py`, `Pipfile`, and `environment.yml` in addition to `requirements.txt` / `package.json`.
+- **L6 egress AST lint hardening.** The "never phones home" test now detects `os` aliases, `from os import …` of banned attrs, `__import__(...)`, and `importlib` dynamic loaders (`importlib.import_module`, `importlib.util.spec_from_file_location`), while still allowing read-only `importlib.metadata`.
+- **L6 `Anchor` zero-cadence footgun guard.** `audit.Anchor` now raises `ValueError` when a sink (`local_path` or `shipper`) is supplied but both `every_n=0` and `every_minutes=0`, which would otherwise silently disable anchoring.
+- **L7 `STRICT_SANITIZE_COMPLIANCE` derived from preset attribute.** `audit.PRESETS` now carries a `sanitize_strict` flag; `config.STRICT_SANITIZE_COMPLIANCE` is derived from it instead of a hard-coded list.
+- **Packaging — PEP-562 `__getattr__`.** A bare `import agent_shield` is now sufficient for later attribute access (`agent_shield.bash_guard`, `agent_shield.sanitize`, etc.) to lazily load submodules while preserving the no-eager-import property.
+- **L1 `skill_vetting` walker DoS hardening.** Directory scans now bound symlink/junction traversal to the target tree and enforce aggregate file-count / byte budgets, preventing a hostile package from soft-DoS-ing the vetter.
+- **Release-check coverage.** Added `tests/test_packaging.py` to pin the PEP-562 contract.
+
+### Changed
+- `audit.PRESETS` gains a `sanitize_strict` key; existing preset behavior is unchanged.
+- Version-bearing files and docs are coherently bumped to `0.2.0`.
+
+### Security
+- **Egress lint coverage widened** so dynamic-import and `os`-alias bypasses of the "no outbound calls / no native exec" invariant are caught by the AST suite.
+- **Anchor footgun closed** so a configured sink cannot be accidentally no-op'd by zero cadence.
+- **Skill vetting bounded** against symlink-escape and oversized-tree scan attacks.
 
 ## [0.1.0a4] — 2026-06-19 — readiness-hardening alpha + Release A
 

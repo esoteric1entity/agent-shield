@@ -121,7 +121,7 @@ argument; see *Deferred to v0.2*).
 Unknown keys and unknown tables are **ignored** (no crash). In particular there
 are **no `extra_red` / `extra_yellow` keys** in v0.1 — a config that could append
 to, let alone remove from, a guard's pattern tiers is a policy-weakening surface
-and is deferred to v0.2 with its own review.
+and is deferred to a post-v0.2.0 release with its own review.
 
 ---
 

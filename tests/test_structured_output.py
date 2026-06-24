@@ -348,7 +348,10 @@ def test_valid_shape_malicious_payload_passes():
 
 def test_no_top_level_clash_and_lazy_import():
     import agent_shield
-    assert "structured_output" in agent_shield.__all__
+    # ``__all__`` intentionally keeps only GuardResult; submodules are still
+    # lazy-accessible via __getattr__ and do not shadow sibling names.
+    assert "structured_output" in agent_shield._LAZY_SUBMODULES
+    assert getattr(agent_shield, "structured_output") is agent_shield.structured_output
     assert not hasattr(so, "Result")
     assert not hasattr(so, "Finding")
 

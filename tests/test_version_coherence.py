@@ -27,7 +27,7 @@ _CANONICAL = _pyproject_version()
 def test_pyproject_version_is_defined():
     assert _CANONICAL
     # Sanity: we expect pre-release alpha versions like 0.1.0a5.
-    assert re.fullmatch(r"\d+\.\d+\.\d+(?:a|b|rc)\d+", _CANONICAL)
+    assert re.fullmatch(r"\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?", _CANONICAL)
 
 
 def test_init_fallback_matches_pyproject():

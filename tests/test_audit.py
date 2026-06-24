@@ -434,6 +434,24 @@ def test_anchor_rejects_negative_every_minutes():
         audit.Anchor(every_minutes=-5)
 
 
+def test_anchor_rejects_zero_cadence_with_shipper():
+    """A sink with both triggers disabled would silently turn anchoring off."""
+    with pytest.raises(ValueError):
+        audit.Anchor(every_n=0, every_minutes=0, shipper=lambda head: None)
+
+
+def test_anchor_rejects_zero_cadence_with_local_path():
+    with pytest.raises(ValueError):
+        audit.Anchor(every_n=0, every_minutes=0, local_path=Path("/tmp/anchor.jsonl"))
+
+
+def test_anchor_allows_zero_cadence_when_no_sink():
+    """An Anchor without a sink is a deliberate no-op, so zero cadence is fine."""
+    a = audit.Anchor(every_n=0, every_minutes=0)
+    assert a.local_path is None
+    assert a.shipper is None
+
+
 # ----- Group B: head shape + shipper handoff -----
 def test_shipper_receives_head_on_trigger(tmp_path):
     collector = CollectorShipper()
@@ -782,9 +800,14 @@ _BANNED_IMPORT_ROOTS = {"urllib", "http", "httpx", "requests", "aiohttp",
                         "ftplib", "smtplib", "ssl", "asyncio", "subprocess", "ctypes"}
 _BANNED_SOCKET_ATTRS = {"socket", "connect", "connect_ex", "bind", "sendto",
                         "send", "sendall", "create_connection"}
-_BANNED_OS_ATTRS = {"system", "popen", "execv", "execve", "execvp", "execl",
-                    "spawnv", "spawnl", "spawnvp"}
-_BANNED_BUILTINS = {"eval", "exec"}
+_BANNED_OS_ATTRS = {"system", "popen", "execv", "execve", "execvp", "execvpe",
+                    "execl", "execlp", "execle", "execlpe",
+                    "spawnv", "spawnve", "spawnl", "spawnle",
+                    "spawnvp", "spawnvpe", "spawnlp", "spawnlpe",
+                    "posix_spawn", "posix_spawnp"}
+_BANNED_BUILTINS = {"eval", "exec", "__import__"}
+_IMPORTLIB_DYNAMIC_ATTRS = {"import_module"}
+_IMPORTLIB_UTIL_DYNAMIC_ATTRS = {"spec_from_file_location", "module_from_spec"}
 
 
 def _root(name: str) -> str:
@@ -792,16 +815,25 @@ def _root(name: str) -> str:
 
 
 def _egress_offenders(source: str, name: str = "<src>") -> list[str]:
-    """AST scan for any network / native-exec egress capability — alias- and
-    from-import-robust. A naive `socket.<attr>` / root-only scan misses
+    """AST scan for any network / native-exec / dynamic-code egress capability —
+    alias- and from-import-robust. A naive `socket.<attr>` / root-only scan misses
     `import socket as s; s.connect(...)`, `from socket import create_connection`,
-    `subprocess`, `os.system`, etc. This is a best-effort lint, NOT a sandbox.
-    `socket.gethostname` and ordinary `os` use are intentionally allowed.
+    `subprocess`, `os.system`, `import os as o; o.system(...)`, `__import__(...)`,
+    and `importlib.import_module(...)`. This is a best-effort lint, NOT a sandbox.
+    `socket.gethostname`, ordinary `os` use, and read-only `importlib.metadata` are
+    intentionally allowed.
     """
     tree = ast.parse(source, filename=name)
     offenders: list[str] = []
-    socket_names: set[str] = set()        # local names bound to the socket module
-    from_socket_banned: set[str] = set()  # names imported FROM socket that are egress attrs
+    socket_names: set[str] = set()              # local names bound to the socket module
+    from_socket_banned: set[str] = set()        # names imported FROM socket that are egress attrs
+    os_names: set[str] = set()                  # local names bound to the os module
+    from_os_banned: set[str] = set()            # names imported FROM os that are banned attrs
+    importlib_names: set[str] = set()           # local names bound to importlib
+    from_importlib_banned: set[str] = set()     # names imported FROM importlib that are dynamic loaders
+    importlib_util_names: set[str] = set()      # local names bound to importlib.util
+    importlib_util_direct: set[str] = set()     # names imported directly FROM importlib.util
+
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for a in node.names:
@@ -810,6 +842,14 @@ def _egress_offenders(source: str, name: str = "<src>") -> list[str]:
                     offenders.append(f"{name}: import {a.name}")
                 if root == "socket":
                     socket_names.add(a.asname or root)
+                if root == "os":
+                    os_names.add(a.asname or _root(a.name))
+                if a.name == "importlib" or a.name.startswith("importlib."):
+                    local = a.asname or a.name
+                    if a.name == "importlib":
+                        importlib_names.add(local)
+                    elif a.name == "importlib.util":
+                        importlib_util_names.add(local)
         elif isinstance(node, ast.ImportFrom):
             root = _root(node.module or "")
             if root in _BANNED_IMPORT_ROOTS:
@@ -818,18 +858,79 @@ def _egress_offenders(source: str, name: str = "<src>") -> list[str]:
                 for a in node.names:
                     if a.name in _BANNED_SOCKET_ATTRS:
                         from_socket_banned.add(a.asname or a.name)
+            if node.module == "os":
+                for a in node.names:
+                    if a.name in _BANNED_OS_ATTRS:
+                        from_os_banned.add(a.asname or a.name)
+            # importlib.metadata and importlib.util are allowed as imports; only
+            # dynamic loaders (import_module, spec_from_file_location) are banned.
+            if node.module == "importlib":
+                for a in node.names:
+                    if a.name == "import_module":
+                        from_importlib_banned.add(a.asname or a.name)
+                    elif a.name == "util":
+                        importlib_util_names.add(a.asname or a.name)
+            elif node.module == "importlib.util":
+                for a in node.names:
+                    if a.name in _IMPORTLIB_UTIL_DYNAMIC_ATTRS:
+                        importlib_util_direct.add(a.asname or a.name)
+
+    def _is_local_agent_shield_import(node: ast.Call) -> bool:
+        """PEP-562 lazy submodule loading is intentional, not an egress vector.
+
+        Recognizes both a literal ``"agent_shield." + name`` BinOp (used in
+        ``__init__.py`` so the linter can see the concrete prefix) and a plain
+        constant module name.
+        """
+        if not node.args:
+            return False
+        first = node.args[0]
+        if isinstance(first, ast.Constant) and isinstance(first.value, str):
+            return first.value.startswith("agent_shield.")
+        if isinstance(first, ast.BinOp) and isinstance(first.op, ast.Add):
+            left = first.left
+            if isinstance(left, ast.Constant) and isinstance(left.value, str):
+                return left.value.startswith("agent_shield.")
+        return False
+
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         fn = node.func
-        if isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name):
-            if fn.value.id in socket_names and fn.attr in _BANNED_SOCKET_ATTRS:
-                offenders.append(f"{name}: {fn.value.id}.{fn.attr}(...)")
-            elif fn.value.id == "os" and fn.attr in _BANNED_OS_ATTRS:
-                offenders.append(f"{name}: os.{fn.attr}(...)")
+        if isinstance(fn, ast.Attribute):
+            base_name = ""
+            if isinstance(fn.value, ast.Name):
+                base_name = fn.value.id
+            elif isinstance(fn.value, ast.Attribute) and isinstance(fn.value.value, ast.Name):
+                # chained: importlib.util.<attr>
+                base_name = f"{fn.value.value.id}.{fn.value.attr}"
+            if base_name in socket_names and fn.attr in _BANNED_SOCKET_ATTRS:
+                offenders.append(f"{name}: {base_name}.{fn.attr}(...)")
+            elif base_name in os_names and fn.attr in _BANNED_OS_ATTRS:
+                offenders.append(f"{name}: {base_name}.{fn.attr}(...)")
+            elif base_name in importlib_names and fn.attr in _IMPORTLIB_DYNAMIC_ATTRS:
+                if not _is_local_agent_shield_import(node):
+                    offenders.append(f"{name}: {base_name}.{fn.attr}(...)")
+            elif base_name in importlib_util_names and fn.attr in _IMPORTLIB_UTIL_DYNAMIC_ATTRS:
+                offenders.append(f"{name}: {base_name}.{fn.attr}(...)")
+            elif (
+                base_name == "importlib.util"
+                and "importlib" in importlib_names
+                and fn.attr in _IMPORTLIB_UTIL_DYNAMIC_ATTRS
+            ):
+                # ``import importlib`` makes ``importlib.util`` reachable; catch the
+                # chained dynamic loader call without requiring a separate util import.
+                offenders.append(f"{name}: importlib.util.{fn.attr}(...)")
         elif isinstance(fn, ast.Name):
             if fn.id in from_socket_banned:
                 offenders.append(f"{name}: {fn.id}(...) (from socket)")
+            elif fn.id in from_os_banned:
+                offenders.append(f"{name}: {fn.id}(...) (from os)")
+            elif fn.id in from_importlib_banned:
+                if not _is_local_agent_shield_import(node):
+                    offenders.append(f"{name}: {fn.id}(...) (from importlib)")
+            elif fn.id in importlib_util_direct:
+                offenders.append(f"{name}: {fn.id}(...) (from importlib.util)")
             elif fn.id in _BANNED_BUILTINS:
                 offenders.append(f"{name}: {fn.id}(...)")
     return offenders
@@ -1021,6 +1122,36 @@ def test_egress_scan_flags_subprocess_and_os_system():
 def test_egress_scan_allows_legit_socket_and_os_use():
     assert _egress_offenders("import socket\nsocket.gethostname()") == []
     assert _egress_offenders("import os\nos.environ.get('X')\nx = os.SEEK_END") == []
+
+
+def test_egress_scan_flags_os_alias_and_from_import():
+    assert _egress_offenders("import os as o\no.system('evil')")
+    assert _egress_offenders("from os import system, popen\nsystem('evil')")
+    assert _egress_offenders("from os import system as run\nrun('evil')")
+
+
+def test_egress_scan_flags_dynamic_import_vectors():
+    assert _egress_offenders("__import__('evil')")
+    assert _egress_offenders("import importlib\nimportlib.import_module('evil')")
+    assert _egress_offenders("from importlib import import_module\nimport_module('evil')")
+    assert _egress_offenders("import importlib.util\nimportlib.util.spec_from_file_location('x', '/tmp/evil.py')")
+    assert _egress_offenders("from importlib.util import spec_from_file_location\nspec_from_file_location('x', '/tmp/evil.py')")
+    # ``import importlib`` alone makes ``importlib.util`` reachable.
+    assert _egress_offenders("import importlib\nimportlib.util.spec_from_file_location('x', '/tmp/evil.py')")
+
+
+def test_egress_scan_allows_local_agent_shield_import_module():
+    # PEP-562 lazy submodule loading intentionally uses importlib.import_module.
+    # Both a plain constant and a "agent_shield." + name BinOp must be whitelisted.
+    assert _egress_offenders("import importlib\nimportlib.import_module('agent_shield.bash_guard')") == []
+    assert _egress_offenders("def __getattr__(name):\n    import importlib\n    return importlib.import_module('agent_shield.' + name)") == []
+
+
+def test_egress_scan_allows_importlib_metadata():
+    # The package uses importlib.metadata.version() for version resolution; that
+    # is read-only and must not be flagged.
+    assert _egress_offenders("from importlib.metadata import version\nversion('agent-shield')") == []
+    assert _egress_offenders("import importlib.metadata\nimportlib.metadata.version('agent-shield')") == []
 
 
 # ----- Fix F: mutation-killing regression tests for under-covered branches -----
