@@ -5,7 +5,7 @@
 > *A **PDuk Brainworks** project. Sibling to the [Ultimate Memory Stack](https://github.com/esoteric1entity/ultimate-memory-stack). Apache-2.0.*
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Status: alpha](https://img.shields.io/badge/Status-v0.1.0a4_alpha-yellow.svg)](#project-status)
+[![Status: alpha](https://img.shields.io/badge/Status-v0.2.0_alpha-yellow.svg)](#project-status)
 [![Python: ≥3.11](https://img.shields.io/badge/Python-%E2%89%A53.11-green.svg)](pyproject.toml)
 [![Tests](https://github.com/esoteric1entity/agent-shield/actions/workflows/test.yml/badge.svg)](https://github.com/esoteric1entity/agent-shield/actions/workflows/test.yml)
 
@@ -15,7 +15,7 @@
 
 `agent-shield` is a layered defensive overlay for AI agents. It intercepts what your agent is about to do — run a command or write a file — and applies a tiered RED / YELLOW / GREEN decision policy before letting it through. (Network egress — fetching a URL — is the roadmap Layer 5, not yet shipped.)
 
-v0.1.0 ships **six of the eight layers** — Layers 1, 2, 3, 4, 6, and 7 (see [The 8 layers](#the-8-layers) and [Project status](#project-status)):
+v0.2.0 ships **six of the eight layers** — Layers 1, 2, 3, 4, 6, and 7 (see [The 8 layers](#the-8-layers) and [Project status](#project-status)):
 
 - **Layer 4 — Runtime Hooks** is the headline runtime surface. It runs on a **harness-agnostic architecture** (one neutral decision core, per-harness adapters) with two functional adapters shipping today: **Claude Code** (via PreToolUse hook; CI-verified) and **OpenClaw** (via `before_tool_call`; live but enforcement requires a recent gateway — see [`docs/adapter_status.md`](docs/adapter_status.md)). Additional harnesses (Codex, Gemini, Copilot, etc.) are roadmap.
   - **`bash_guard`** — inspects bash commands before execution
@@ -44,8 +44,8 @@ Install (pick your door):
 # From the repo (the install path today)
 pip install git+https://github.com/esoteric1entity/agent-shield.git
 
-# From PyPI — not yet published; coming with the public release:
-#   pip install agent-shield
+# From PyPI:
+#   pip install ai-agent-shield
 ```
 
 Or **tell your agent**: clone the repo and say *"install this — read `INSTALL_AGENT.md` and follow it."* The agent walks a documented, consent-gated flow (it never touches your settings without showing you the diff).
@@ -82,18 +82,28 @@ Wire it into `~/.claude/settings.json` (the **module form** below — `python -m
     "PreToolUse": [
       {
         "matcher": "Bash",
-        "hooks": [{"type": "command", "command": "python -m agent_shield.bash_guard"}]
+        "hooks": [{"type": "command", "command": "python -m agent_shield.bash_guard", "timeout": 5}]
       },
       {
         "matcher": "Write|Edit|MultiEdit",
-        "hooks": [{"type": "command", "command": "python -m agent_shield.write_guard"}]
+        "hooks": [{"type": "command", "command": "python -m agent_shield.write_guard", "timeout": 5}]
       }
     ]
   }
 }
 ```
 
-**Use it with OpenClaw (or another harness):** the same neutral decision core backs every harness. Wire the OpenClaw `before_tool_call` hook to the `agent-shield-openclaw-guard` console script (or `python -m agent_shield.adapters.openclaw`) — it reads the tool event as JSON on stdin and returns the block / ask / allow decision. See [`docs/adapter_status.md`](docs/adapter_status.md) for the adapter contract and gateway requirement. The library API (`bash_guard.check_command()`, `write_guard.check_path()`) is identical across harnesses.
+**Use it with OpenClaw (or another harness):** the same neutral decision core backs every harness. Wire the OpenClaw `before_tool_call` hook to the `agent-shield-openclaw-guard` console script (or `python -m agent_shield.adapters.openclaw`) — it reads the tool event as JSON on stdin and returns the block / ask / allow decision.
+
+For OpenClaw, the package ships a ready-to-install companion plugin directory inside
+`agent_shield/adapters/openclaw_plugin/`. The exact install command and gateway version
+requirement are in [`docs/adapter_status.md`](docs/adapter_status.md). If you installed
+an earlier alpha that used a bare `export const hooks = {...}` registration, migrate
+to the current plugin-SDK shape; the uninstall and migration steps are in
+[`docs/MIGRATION.md`](docs/MIGRATION.md).
+
+The library API (`bash_guard.check_command()`, `write_guard.check_path()`) is identical
+across harnesses.
 
 ---
 
@@ -102,13 +112,13 @@ Wire it into `~/.claude/settings.json` (the **module form** below — `python -m
 | # | Layer | What it does | Status |
 |---|---|---|---|
 | 0 | Operational + Automation | Cron schedule for hygiene tasks (audit / key / log rotation) | 🟡 pre-release |
-| 1 | **Skill / Tool Vetting** | **`skill_vetting`** — static read-only scan → 3-tier verdict (approved/review/rejected); 5-layer manual escalation for the review tier | ✅ **v0.1.0** |
-| 2 | **Input Sanitization** | **`sanitize`** — 4-layer (structural strip · content flag · encoding detect · nonce-delimited context wrap) for untrusted incoming content | ✅ **v0.1.0** |
-| 3 | **Structured Output** | **`structured_output`** — enforce a declared schema (shape, not content/intent) + reject prose-wrapped JSON | ✅ **v0.1.0** |
-| 4 | **Runtime Hooks** | **`bash_guard` + `write_guard`** | ✅ **v0.1.0** |
+| 1 | **Skill / Tool Vetting** | **`skill_vetting`** — static read-only scan → 3-tier verdict (approved/review/rejected); 5-layer manual escalation for the review tier | ✅ **v0.2.0** |
+| 2 | **Input Sanitization** | **`sanitize`** — 4-layer (structural strip · content flag · encoding detect · nonce-delimited context wrap) for untrusted incoming content | ✅ **v0.2.0** |
+| 3 | **Structured Output** | **`structured_output`** — enforce a declared schema (shape, not content/intent) + reject prose-wrapped JSON | ✅ **v0.2.0** |
+| 4 | **Runtime Hooks** | **`bash_guard` + `write_guard`** | ✅ **v0.2.0** |
 | 5 | Network Egress | URL allowlist + Ollama proxy + rate limiting | 🟡 pre-release |
-| 6 | **Structured Audit** | **`audit`** — append-only JSONL + SHA-256 hash-chain (tamper-evident), `verify()` + `--verify` CLI, optional external anchor (local-path / bring-your-own-shipper — **never phones home**) | ✅ **v0.1.0** |
-| 7 | **Configuration** | **`config`** — TOML loader + compliance presets + the shared cross-layer contract; never-crash, opt-in wiring | ✅ **v0.1.0** |
+| 6 | **Structured Audit** | **`audit`** — append-only JSONL + SHA-256 hash-chain (tamper-evident), `verify()` + `--verify` CLI, optional external anchor (local-path / bring-your-own-shipper — **never phones home**) | ✅ **v0.2.0** |
+| 7 | **Configuration** | **`config`** — TOML loader + compliance presets + the shared cross-layer contract; never-crash, opt-in wiring | ✅ **v0.2.0** |
 
 ---
 
@@ -127,7 +137,7 @@ Every check returns a `GuardResult` with one of three decisions:
 ### `bash_guard.check_command(cmd)` — patterns
 
 - **24 RED patterns**: destructive filesystem ops — `rm -rf` against root / home / cwd targets, including quoted (`rm -rf "/"`), split-flag (`rm -r -f /`), and bundled / reordered / intervening-flag (`rm -rfv /`, `rm -fvr /`, `rm -rf -- /`) forms, `--no-preserve-root`, `mkfs.*`, `format X:` / `wipefs`, `dd` onto block devices, fork bombs; remote-code execution — pipe-to-shell (`curl … | bash`), pipe-to-source, decode-and-execute (`base64 -d | sh`), process substitution (`bash <(curl …)`), encoded PowerShell; credential exfiltration — `$VAR` / `${VAR}` secrets in network commands, uploading secret files (`curl -d @id_rsa`), piping secret files to network tools.
-- **11 YELLOW patterns**: recursive force-deletes off-root (`rm -rf`, split-flag form, Windows `del /s`, `Remove-Item -Recurse -Force`, `shred`); network uploads; destructive git operations; package installs; `chmod 777`; Windows registry edits; service/process control.
+- **12 YELLOW patterns**: recursive force-deletes off-root (`rm -rf`, split-flag form, Windows `del /s`, `Remove-Item -Recurse -Force`, `shred`); network uploads; destructive git operations; package installs; `chmod 777`; Windows registry edits; service/process control; disabling the agent-shield runtime guard (`agent-shield-plugin disable`, `python -m agent_shield.plugin_cli disable`, and shell-wrapped forms).
 - **GREEN is not a pattern list** — it is the default: anything not matched by a RED or YELLOW pattern passes silently. There is no allowlist.
 
 ### `write_guard.check_path(file_path)` — patterns
@@ -233,7 +243,7 @@ so.extract_json(text)     # pull the first JSON object out of surrounding text
 
 - **Type matching is by exact identity** (not `isinstance`): an `int` field rejects `True`/`False` (bool is not int), a `bool` field rejects `0`/`1`; `int` widens to `float` (JSON has no `1` vs `1.0`); `NaN`/`Infinity` are rejected. Supports nested `Schema`, `list[T]`, `dict[str, T]`, `Union`/`Optional`, `Literal`, `(type, default)` optionals, and `Field(...)` constraints (length / numeric range / regex / choices).
 - **Collect-all, deterministic errors** in schema-declared order; **strict** rejects unexpected keys, **lenient** drops them; `value` is a fresh dict and `enforce` never mutates its input.
-- **Canary tokens and pydantic interop are deferred to future releases.** v0.1 ships a stdlib-only validator.
+- **Canary tokens and pydantic interop are deferred to future releases.** v0.2.0 ships a stdlib-only validator.
 
 Full DSL grammar, the type rules, strict/lenient + default-fill, the JSON-discipline helpers, and bypasses & limitations: [`docs/STRUCTURED_OUTPUT.md`](docs/STRUCTURED_OUTPUT.md).
 
@@ -270,14 +280,9 @@ log = audit.AuditLog("audit.jsonl",
                      anchor=audit.Anchor(local_path="/mnt/worm/anchor.jsonl"))
 ```
 
-The anchor periodically (every N entries or T minutes — never per-event) copies a minimal receipt — `{seq, entry_hash, ts}`, no PII — to its target, fail-open: a *failing* shipper never blocks the audited write. **Resistance holds only when that target is genuinely independent** — a separate / write-once volume or another host; an anchor on the **same volume** as the log is not independent and stays tamper-evident only.
+The anchor periodically (every N entries or T minutes — never per-event) copies a minimal receipt — `{seq, entry_hash, ts}`, no PII — to its target, fail-open: a *failing* shipper never blocks the audited write. **Resistance holds only when that target is genuinely independent** — a separate / write-once volume or another host; an anchor on the **same volume** as the log is not independent and stays tamper-evident only. The log file is written `0600` and is a **forensic** record, not a live guard. Retention/rotation enforcement is not automated in this release.
 
-**agent-shield never phones home.** The shipped package makes **no outbound network calls** — its only socket use is a local `gethostname()` for the audit machine field, and the built-in anchor writes to a local path only. To anchor off-box, you **bring your own shipper** (a callable that transmits the receipt however you choose); the egress is your code and your policy. There is no `url`/`endpoint` parameter, and the no-network guarantee is checked by a best-effort AST lint in the test suite (not a sandbox). Your shipper runs **synchronously, in-process** and cannot be timed out in v0.1 — keep it fast, or do slow/network work asynchronously yourself. A ready-to-copy recipe and a full risk guide live in [`examples/remote_anchor_shipper.py`](examples/remote_anchor_shipper.py) and [`docs/REMOTE_ANCHORING.md`](docs/REMOTE_ANCHORING.md).
-
-The audit log is **tamper-evident, not tamper-proof**: a hash chain makes undetected
-edits hard, but a sufficiently privileged attacker can delete or rebuild the file. It
-is written `0600` and is a **forensic** record, not a live guard. Retention/rotation
-enforcement is not automated in this release.
+**agent-shield never phones home.** The shipped package makes **no outbound network calls** — its only socket use is a local `gethostname()` for the audit machine field, and the built-in anchor writes to a local path only. To anchor off-box, you **bring your own shipper** (a callable that transmits the receipt however you choose); the egress is your code and your policy. There is no `url`/`endpoint` parameter, and the no-network guarantee is checked by a best-effort AST lint in the test suite (not a sandbox). Your shipper runs **synchronously, in-process** and cannot be timed out in v0.2.0 — keep it fast, or do slow/network work asynchronously yourself. A ready-to-copy recipe and a full risk guide live in [`examples/remote_anchor_shipper.py`](examples/remote_anchor_shipper.py) and [`docs/REMOTE_ANCHORING.md`](docs/REMOTE_ANCHORING.md).
 
 Full field reference, verification procedure, and limits: [`docs/AUDIT_SCHEMA.md`](docs/AUDIT_SCHEMA.md).
 
@@ -300,9 +305,9 @@ log = audit.AuditLog(path=cfg.audit.path, preset=cfg.compliance)   # opt-in wiri
 ```
 
 - **Never-crash.** A missing / malformed / mistyped / oversized / unknown-preset config degrades to built-in defaults with a surfaced `UserWarning` — a layer always runs with zero config.
-- **Preset parity.** Compliance presets mirror `audit.PRESETS` **exactly** (`general`/`healthcare`/`biotech`), single-sourced — an unknown/typo'd preset can never reach `AuditLog`. There is **no `enterprise` preset** in v0.1.0; it is planned for v0.2.
+- **Preset parity.** Compliance presets mirror `audit.PRESETS` **exactly** (`general`/`healthcare`/`biotech`), single-sourced — an unknown/typo'd preset can never reach `AuditLog`. There is **no `enterprise` preset** in v0.2.0; it is planned for a future release.
 - **Precedence:** built-in defaults < config file < environment < explicit kwargs. The file is found by search (first existing wins): `$AGENT_SHIELD_CONFIG` → `./agent-shield.toml` → `~/.agent-shield/config.toml`. The config file is a `write_guard` **YELLOW** target. **TOML only** (stdlib `tomllib`); YAML is rejected (dependency + `yaml.load` footgun).
-- **Opt-in wiring** in v0.1 — the guards don't auto-load config (no hot-path I/O); callers pass slices. Pattern add-ons (`extra_red`/`extra_yellow`) are deferred to v0.2.
+- **Opt-in wiring** in v0.2.0 — the guards don't auto-load config (no hot-path I/O); callers pass slices. Pattern add-ons (`extra_red`/`extra_yellow`) are deferred to a post-v0.2.0 release.
 
 Schema, every key, the presets, search-path + precedence, env vars, and bypasses & limitations: [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
 
@@ -331,7 +336,7 @@ The CLI reads `{"tool_input": {"command": "..."}}` (for `bash_guard`) or `{"tool
 
 Input that cannot be parsed at all cannot be evaluated and is **allowed** — see [Bypasses and limitations](#bypasses-and-limitations) for why, and what that means for you.
 
-For deployments without Python, the `tests/bash-guard.sh` and `tests/write-guard.sh` sources are **decision-equivalent** (verified to produce equivalent decisions; human-readable reason strings may differ in wording) and can be used directly. When the bash guards find no working Python interpreter, RED checks additionally scan the raw hook JSON — degraded parsing fails **closed** for the dangerous tier.
+For deployments without Python, the `tests/bash-guard.sh` and `tests/write-guard.sh` sources are **decision-equivalent** (verified to produce equivalent decisions; human-readable reason strings may differ in wording) and can be used directly. These sources are **not installed by `pip install ai-agent-shield`**; copy them manually from the repository if you need them. When the bash guards find no working Python interpreter, RED checks additionally scan the raw hook JSON — degraded parsing fails **closed** for the dangerous tier.
 
 ---
 
@@ -356,14 +361,14 @@ python tests/run_equivalence_test.py
 
 Four suites: Python guard/CLI tests, bash-subprocess equivalence, a bash-native harness, and a head-to-head equivalence runner. All must be green before a release is tagged; run them rather than trusting a number printed here. CI runs the full suite on Linux, macOS, and Windows (Python 3.11–3.14); platforms outside that matrix (e.g. BSD) aren't verified.
 
-**Quality process.** agent-shield is AI-assisted by design — built with AI agents under human architectural direction — and engineered accordingly: changes are developed test-first (red → green) and must pass all four suites before a release is tagged. Releases additionally go through an independent adversarial review pass, with reviewers tasked to break the changes rather than approve them — for v0.1.0 that pass uncovered issues in early hardening attempts, which were corrected and re-verified before shipping. Platform note: the bash-subprocess pytest cases shell out to bash. On Windows the harness resolves Git-Bash/Cygwin explicitly and never the WSL `bash.exe` shim — Python's `subprocess` otherwise mis-resolves a bare `bash` to that shim (Win32 searches `System32` before `PATH`), and it hangs when driven from native-Windows Python. So the parity cases now run on Windows too; if no usable bash is found they skip with a clear reason instead of hanging. Set `AGENT_SHIELD_TEST_BASH` to a specific `bash.exe` to override resolution.
+**Quality process.** agent-shield is AI-assisted by design — built with AI agents under human architectural direction — and engineered accordingly: changes are developed test-first (red → green) and must pass all four suites before a release is tagged. Releases additionally go through an independent adversarial review pass, with reviewers tasked to break the changes rather than approve them — for v0.2.0 that pass uncovered issues in early hardening attempts, which were corrected and re-verified before shipping. Platform note: the bash-subprocess pytest cases shell out to bash. On Windows the harness resolves Git-Bash/Cygwin explicitly and never the WSL `bash.exe` shim — Python's `subprocess` otherwise mis-resolves a bare `bash` to that shim (Win32 searches `System32` before `PATH`), and it hangs when driven from native-Windows Python. So the parity cases now run on Windows too; if no usable bash is found they skip with a clear reason instead of hanging. Set `AGENT_SHIELD_TEST_BASH` to a specific `bash.exe` to override resolution.
 
 ---
 
 ## Troubleshooting
 
 - **`ModuleNotFoundError: No module named 'agent_shield'`** — the hook/CLI is running under a different Python than the one agent-shield is installed in. Activate the right venv, or point the hook at that interpreter (e.g. `/path/to/venv/bin/python -m agent_shield.bash_guard`).
-- **`ModuleNotFoundError: No module named 'agent_shield'` *after uninstalling*** — `pip uninstall` removed the package, but the two `PreToolUse` hook entries are still in your `settings.json`, so every tool call now fails. Remove the agent-shield `Bash` and `Write|Edit|MultiEdit` entries from `~/.claude/settings.json` (or the project `.claude/settings.json`) and restart. Full steps: [`INSTALL_AGENT.md`](INSTALL_AGENT.md) Step 6.
+- **`ModuleNotFoundError: No module named 'agent_shield'` *after uninstalling*** — `pip uninstall` removed the package, but the two `PreToolUse` hook entries are still in your `settings.json`, so every tool call now fails. If the `agent-shield-plugin` command is still available (Claude Code only), run it first: `agent-shield-plugin disable` (or `agent-shield-plugin --project <dir> disable`) to remove them safely. If the CLI is gone because the package was already uninstalled, manually edit the file and remove the two `PreToolUse` entries for `Bash` and `Write|Edit|MultiEdit` that call `agent_shield.bash_guard` / `agent_shield.write_guard`. Then restart. Full steps: [`INSTALL_AGENT.md`](INSTALL_AGENT.md) Step 6. If you wired during an earlier alpha, your settings may contain a non-functional legacy shape (`hookEventName`/`toolNamePattern`) — migrate via [`docs/MIGRATION.md`](docs/MIGRATION.md).
 - **A safe command produces no output** — that's correct: `allow` is a silent pass (empty stdout, exit 0). Test with a known-bad command (`echo '{"tool_input":{"command":"rm -rf /"}}' | python -m agent_shield.bash_guard`) to see a `deny`.
 - **Hooks don't take effect in Claude Code** — restart the session after editing `settings.json`; hooks are read at startup.
 - **Windows: the bash-parity tests are slow or skip** — the suite resolves Git-Bash/Cygwin explicitly (never the WSL `bash.exe` shim) and skips cleanly if no POSIX bash is found; set `AGENT_SHIELD_TEST_BASH` to a specific `bash.exe` to override. The runtime guards are pure Python and need no bash.
@@ -446,7 +451,7 @@ agent-shield is a security tool from an independent author — so it's built to 
 
 ## Project status
 
-**v0.1.0 alpha** — Layers 1, 2, 3, 4, 6, and 7 ship. Layers 0 and 5 are in active development. **Python 3.11+** (LTS); tomllib stdlib → zero external deps. Layer 4 runs on a harness-agnostic architecture: one neutral decision core with two functional adapters today — Claude Code (CI-verified) and OpenClaw (live; enforcement requires a recent gateway — see [`docs/adapter_status.md`](docs/adapter_status.md)). Additional harnesses are roadmap.
+**v0.2.0 alpha** — Layers 1, 2, 3, 4, 6, and 7 ship. Layers 0 and 5 are in active development. **Python 3.11+** (LTS); tomllib stdlib → zero external deps. Layer 4 runs on a harness-agnostic architecture: one neutral decision core with two functional adapters today — Claude Code (CI-verified) and OpenClaw (live; enforcement requires a recent gateway — see [`docs/adapter_status.md`](docs/adapter_status.md)). Additional harnesses are roadmap.
 
 | Item | Status |
 |---|---|

@@ -126,7 +126,7 @@ def test_normalize_path_docstring_states_ascii_only_contract():
     strip ASCII whitespace only. The docstring must document the ASCII-only
     contract and may mention NBSP only in the negated 'NOT stripped' sense, so
     the overclaim cannot silently return."""
-    doc = write_guard._normalize_path.__doc__ or ""
+    doc = write_guard.normalize_path.__doc__ or ""
     assert "ASCII whitespace" in doc, "docstring must document the ASCII-only strip contract"
     assert "**NOT** stripped" in doc, "docstring must state non-ASCII whitespace (NBSP) is NOT stripped"
 
@@ -216,3 +216,19 @@ def test_shipped_docs_have_no_enforcement_test_scratch_leak():
 
 def test_adapter_status_documents_openclaw_guard_entry_point():
     assert "agent-shield-openclaw-guard" in ADAPTER_STATUS
+
+
+def test_adapter_status_documents_all_five_console_scripts():
+    scripts = [
+        "agent-shield-bash-guard",
+        "agent-shield-write-guard",
+        "agent-shield-vet",
+        "agent-shield-openclaw-guard",
+        "agent-shield-plugin",
+    ]
+    for script in scripts:
+        assert script in ADAPTER_STATUS, f"docs/adapter_status.md does not document {script}"
+    # The doc should also state the count is five, not four.
+    assert "five:" in ADAPTER_STATUS.lower() or "five " in ADAPTER_STATUS.lower(), (
+        "docs/adapter_status.md should state that the package installs five console scripts"
+    )

@@ -39,9 +39,9 @@ GENESIS = "0" * 64
 #: longer retention). Rotation/retention enforcement is documented-not-built in
 #: v0.1 (see docs/AUDIT_SCHEMA.md); retention_days is exposed for a Layer-0 cron.
 PRESETS = {
-    "general":    {"content_fields_always": False, "retention_days": 90,  "fail_mode": "open"},
-    "healthcare": {"content_fields_always": True,  "retention_days": 365, "fail_mode": "closed"},
-    "biotech":    {"content_fields_always": True,  "retention_days": 365, "fail_mode": "closed"},
+    "general":    {"content_fields_always": False, "retention_days": 90,  "fail_mode": "open",   "sanitize_strict": False},
+    "healthcare": {"content_fields_always": True,  "retention_days": 365, "fail_mode": "closed", "sanitize_strict": True},
+    "biotech":    {"content_fields_always": True,  "retention_days": 365, "fail_mode": "closed", "sanitize_strict": True},
 }
 
 
@@ -133,6 +133,11 @@ class Anchor:
             raise ValueError(f"every_n must be >= 0, got {self.every_n}")
         if self.every_minutes < 0:
             raise ValueError(f"every_minutes must be >= 0, got {self.every_minutes}")
+        if (self.local_path is not None or self.shipper is not None) and self.every_n == 0 and self.every_minutes == 0:
+            raise ValueError(
+                "Anchor has a sink (local_path or shipper) but both cadence triggers "
+                "are disabled (every_n=0 and every_minutes=0); anchoring would be silently off"
+            )
         if self.local_path is not None and not isinstance(self.local_path, Path):
             object.__setattr__(self, "local_path", Path(self.local_path))  # frozen-normalize
 

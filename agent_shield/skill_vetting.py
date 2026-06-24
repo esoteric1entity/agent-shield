@@ -26,9 +26,12 @@ something malicious; it does not guarantee safety. See docs/VETTING_ESCALATION.m
 
 from __future__ import annotations
 
+import ast
 import json
+import os
 import re
 import sys
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final
@@ -50,6 +53,8 @@ _INSTRUCTION_NAMES: Final[frozenset[str]] = frozenset(
     {"skill.md", "readme.md", "claude.md", "agents.md", "hooks.json", "settings.json", "mcp.json"}
 )
 _MAX_BYTES: Final[int] = 2_000_000  # skip pathologically large files (operational guard)
+_MAX_FILES: Final[int] = 10_000  # aggregate file-count budget (DoS hardening)
+_MAX_SCAN_BYTES: Final[int] = 100_000_000  # aggregate byte budget (DoS hardening)
 
 
 # =============================================================================
@@ -66,7 +71,14 @@ _CODE_CATEGORIES: Final[tuple[dict, ...]] = (
         "id": "ENV_BULK", "severity": "high",
         "patterns": _c(r"dict\s*\(\s*os\.environ", r"os\.environ\.copy\s*\(",
                         r"for\s+\w+\s+in\s+os\.environ", r"json\.stringify\s*\(\s*process\.env",
-                        r"object\.keys\s*\(\s*process\.env", r"process\.env\b\s*\)"),
+                        r"object\.(?:keys|entries|values)\s*\(\s*process\.env",
+                        r"array\.from\s*\(\s*process\.env",
+                        r"\{\s*\.\.\.\s*process\.env\s*\}",
+                        r"os\.environ\s*\.\s*(?:items|values|keys)\s*\(",
+                        r"list\s*\(\s*os\.environ\s*\)",
+                        r"tuple\s*\(\s*os\.environ\s*\)",
+                        r"set\s*\(\s*os\.environ\s*\)",
+                        r"\[\s*\*\s*os\.environ\s*\]"),
         "why": "Enumerates ALL environment variables (credential-harvesting risk).",
     },
     {
@@ -262,6 +274,73 @@ def _edit_distance(a: str, b: str) -> int:
     return d[la][lb]
 
 
+def _strip_req_name(spec: str) -> str:
+    """Return the package name from a PEP-440/conda requirement spec.
+
+    Splits on version/option markers and on the ``@ URL`` syntax so a line like
+    ``requests@git+https://...`` still yields ``requests``.
+    """
+    return re.split(r"[=<>!~\[ ;@]", spec, maxsplit=1)[0].strip().lower()
+
+
+def _setup_py_deps(text: str) -> list[str]:
+    """Extract dependency names from setup.py without executing it."""
+    names: list[str] = []
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return names
+
+    def _collect(node):
+        out: list[str] = []
+        if isinstance(node, (ast.List, ast.Tuple)):
+            for elt in node.elts:
+                if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                    out.append(_strip_req_name(elt.value))
+        return out
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    if target.id == "install_requires":
+                        names.extend(_collect(node.value))
+                    elif target.id == "extras_require" and isinstance(node.value, ast.Dict):
+                        for value in node.value.values:
+                            names.extend(_collect(value))
+        elif isinstance(node, ast.Call):
+            for kw in node.keywords:
+                if kw.arg == "install_requires":
+                    names.extend(_collect(kw.value))
+                elif kw.arg == "extras_require" and isinstance(kw.value, ast.Dict):
+                    for value in kw.value.values:
+                        names.extend(_collect(value))
+    return [n for n in names if n]
+
+
+def _environment_yml_deps(text: str) -> list[str]:
+    """Lightweight dependency-name extraction from a conda environment.yml."""
+    names: list[str] = []
+    in_deps = False
+    for line in text.split("\n"):
+        stripped = line.lstrip()
+        if in_deps:
+            if not stripped or not line.startswith((" ", "\t")) or stripped.startswith("#"):
+                # End of dependencies block (next top-level key or blank/comment)
+                if stripped and not stripped.startswith("#"):
+                    in_deps = False
+                continue
+            val = stripped.lstrip("- ").strip()
+            if not val or val.startswith("#"):
+                continue
+            # channel::package or package=version or package
+            val = val.split("::", 1)[-1]
+            names.append(_strip_req_name(val))
+        elif stripped.lower().startswith("dependencies:"):
+            in_deps = True
+    return [n for n in names if n]
+
+
 def _dep_names(rel: str, text: str) -> list[str]:
     names: list[str] = []
     base = rel.rsplit("/", 1)[-1].lower()
@@ -270,7 +349,7 @@ def _dep_names(rel: str, text: str) -> list[str]:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            names.append(re.split(r"[=<>!~\[ ]", line, maxsplit=1)[0].strip().lower())
+            names.append(_strip_req_name(line))
     elif base == "package.json":
         try:
             data = json.loads(text)
@@ -282,6 +361,47 @@ def _dep_names(rel: str, text: str) -> list[str]:
             dep = data.get(keyset)
             if isinstance(dep, dict):
                 names.extend(str(k).lower() for k in dep)
+    elif base == "pyproject.toml":
+        try:
+            data = tomllib.loads(text)
+        except tomllib.TOMLDecodeError:
+            return names
+        if not isinstance(data, dict):
+            return names
+        project = data.get("project")
+        if isinstance(project, dict):
+            deps = project.get("dependencies")
+            if isinstance(deps, list):
+                for spec in deps:
+                    names.append(_strip_req_name(str(spec)))
+            opt = project.get("optional-dependencies")
+            if isinstance(opt, dict):
+                for group in opt.values():
+                    if isinstance(group, list):
+                        for spec in group:
+                            names.append(_strip_req_name(str(spec)))
+        tool = data.get("tool")
+        if isinstance(tool, dict):
+            poetry = tool.get("poetry")
+            if isinstance(poetry, dict):
+                for key in ("dependencies", "dev-dependencies"):
+                    table = poetry.get(key)
+                    if isinstance(table, dict):
+                        names.extend(str(k).lower() for k in table)
+    elif base == "pipfile":
+        try:
+            data = tomllib.loads(text)
+        except tomllib.TOMLDecodeError:
+            return names
+        if isinstance(data, dict):
+            for key in ("packages", "dev-packages"):
+                table = data.get(key)
+                if isinstance(table, dict):
+                    names.extend(str(k).lower() for k in table)
+    elif base == "setup.py":
+        names.extend(_setup_py_deps(text))
+    elif base in ("environment.yml", "environment.yaml"):
+        names.extend(_environment_yml_deps(text))
     return [n for n in names if n]
 
 
@@ -310,6 +430,13 @@ def _tier_for(score: int) -> str:
 # =============================================================================
 # Public API
 # =============================================================================
+def _is_symlink_or_junction(p: Path) -> bool:
+    if p.is_symlink():
+        return True
+    is_junction = getattr(p, "is_junction", None)
+    return bool(is_junction and is_junction())
+
+
 def vet_path(path: str | Path) -> VetResult:
     """Statically vet a skill/tool path and return a VetResult. Read-only; never raises."""
     if path is None or not str(path).strip():
@@ -324,36 +451,94 @@ def vet_path(path: str | Path) -> VetResult:
         # cannot be scanned, so never silently approve.
         return VetResult(0, "review", [], "target is not a regular file or directory — cannot vet")
 
+    # Resolve the root so symlink/junction checks have a stable anchor.
+    try:
+        root = root.resolve()
+    except OSError:
+        return VetResult(0, "review", [], "target could not be resolved — cannot vet")
+
     if root.is_file():
-        files = [root]
+        entries = [root]
         base = root.parent
     else:
-        files = sorted(p for p in root.rglob("*") if p.is_file())
+        # Include file symlinks as files, and directory symlinks/junctions as
+        # entries, so we can detect and bound them even when rglob does not
+        # descend into a directory link on a given Python/platform combination.
+        entries = sorted(
+            p for p in root.rglob("*")
+            if p.is_file() or _is_symlink_or_junction(p)
+        )
         base = root
 
     findings: list[Finding] = []
-    for p in files:
+    files_seen = 0
+    bytes_scanned = 0
+    for p in entries:
+        files_seen += 1
+        if files_seen > _MAX_FILES:
+            findings.append(Finding(
+                _UNSCANNED["id"], _UNSCANNED["severity"], "", 0, "",
+                "Scan stopped: aggregate file-count budget exceeded",
+            ))
+            break
+
         try:
             rel = p.relative_to(base).as_posix()
         except ValueError:
             rel = p.name
+
+        # Bound symlink / junction traversal to the target tree. Apply this to
+        # every file, not just to the link node, so files inside a directory
+        # junction/symlink are also kept within the resolved root.
         try:
-            oversize = p.stat().st_size > _MAX_BYTES
+            real = Path(os.path.realpath(p))
+            if not real.is_relative_to(root):
+                findings.append(Finding(
+                    _UNSCANNED["id"], _UNSCANNED["severity"], rel, 0, "",
+                    "Path leaves the target tree — not scanned",
+                ))
+                continue
+        except (OSError, ValueError):
+            findings.append(Finding(
+                _UNSCANNED["id"], _UNSCANNED["severity"], rel, 0, "",
+                "Path could not be resolved — not scanned",
+            ))
+            continue
+
+        # Directory symlinks/junctions inside the root are bounded above, but they
+        # are not files and must not be read as text. Their contents are either
+        # yielded separately by rglob or, if rglob did not descend, not scanned.
+        if not p.is_file():
+            continue
+
+        try:
+            size = p.stat().st_size
         except OSError:
-            oversize = False
-        if oversize:
+            size = 0
+        if size > _MAX_BYTES:
             # Never silently approve what we couldn't read — emit a finding.
             findings.append(Finding(_UNSCANNED["id"], _UNSCANNED["severity"],
                                     rel, 0, "", _UNSCANNED["why"]))
             continue
+        if bytes_scanned + size > _MAX_SCAN_BYTES:
+            findings.append(Finding(
+                _UNSCANNED["id"], _UNSCANNED["severity"], rel, 0, "",
+                "Scan stopped: aggregate byte budget exceeded",
+            ))
+            break
+
         text = _read_text(p)
         if not text:
             continue
+        bytes_scanned += len(text.encode("utf-8"))
         if p.suffix.lower() in _CODE_EXTS:
             findings.extend(_scan_code(rel, text))
         if _is_instruction(p):
             findings.extend(_scan_injection(rel, text))
-        if p.name.lower() in ("requirements.txt", "package.json"):
+        if p.name.lower() in (
+            "requirements.txt", "package.json", "pyproject.toml", "setup.py",
+            "pipfile", "environment.yml", "environment.yaml",
+        ):
             findings.extend(_scan_typosquat(rel, text))
 
     score = min(10, sum(_SEVERITY_WEIGHT.get(f.severity, 0) for f in findings))

@@ -1,6 +1,6 @@
 """agent-shield — defensive overlay for AI agents.
 
-8-layer architecture; v0.1.0 ships 6 layers — skill_vetting (1), sanitize (2),
+8-layer architecture; v0.2.0 ships 6 layers — skill_vetting (1), sanitize (2),
 structured_output (3), bash_guard + write_guard (4, the runtime hooks), audit
 (6), config (7). Layers 0 (operational) and 5 (network egress) are pre-release.
 
@@ -24,14 +24,33 @@ def _resolve_version() -> str:
     try:
         from importlib.metadata import PackageNotFoundError, version
     except ImportError:  # pragma: no cover - importlib.metadata is stdlib on 3.11
-        return "0.1.0a4"
+        return "0.2.0"
     try:
         return version("agent-shield")
     except PackageNotFoundError:
-        return "0.1.0a4"
+        return "0.2.0"
 
 
 __version__ = _resolve_version()
 
-__all__ = ["GuardResult", "bash_guard", "write_guard", "skill_vetting",
-           "sanitize", "structured_output", "audit", "config"]
+# PEP-562 lazy submodule access: ``import agent_shield`` does not eagerly load
+# the submodules, but ``agent_shield.bash_guard`` resolves them on demand.
+# ``from agent_shield import *`` only exports GuardResult so it does not
+# eager-load submodules either; explicit ``from agent_shield import bash_guard``
+# still works through __getattr__.
+_LAZY_SUBMODULES = frozenset(
+    {"bash_guard", "write_guard", "skill_vetting", "sanitize",
+     "structured_output", "audit", "config"}
+)
+
+__all__ = ["GuardResult"]
+
+
+def __getattr__(name: str):
+    if name in _LAZY_SUBMODULES:
+        import importlib
+
+        mod = importlib.import_module("agent_shield." + name)
+        globals()[name] = mod
+        return mod
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -78,11 +78,11 @@ No specific bypass payload is published here. If you believe you have found a no
 variant not covered by the current detection, please report it via the responsible
 disclosure process above (GitHub Security Advisory).
 
-## Known limitations (v0.1.0 — alpha)
+## Known limitations (v0.2.0 — alpha)
 
 `agent-shield` is **defense-in-depth, not an airtight guarantee.** It raises the cost of a dangerous action and makes tampering evident; it does not make either impossible. The API is **not yet stable** (`0.x`) — breaking changes may land between `0.x` releases, including to close a security gap. Maturity is also signalled by the PyPI `Development Status :: 3 - Alpha` classifier. Known, accepted limits in this release:
 
-- **Coverage: 6 of 8 layers ship.** Layer 0 (operational/automation hygiene) and **Layer 5 (network egress)** are not built. There is **no outbound-egress enforcement** in v0.1 — a `deny` on `curl … | bash` is pattern-based at Layer 4, not a network control.
+- **Coverage: 6 of 8 layers ship.** Layer 0 (operational/automation hygiene) and **Layer 5 (network egress)** are not built. There is **no outbound-egress enforcement** in v0.2.0 — a `deny` on `curl … | bash` is pattern-based at Layer 4, not a network control.
 - **Layer 4 ships with harness-agnostic adapters.** The runtime guards run via two functional adapters — Claude Code (`PreToolUse`, CI-verified) and OpenClaw (`before_tool_call`, gateway-gated). Enforcement status and the additional-harness roadmap are in `docs/adapter_status.md`; OpenClaw enforcement requires a recent gateway and is pending live verification.
 - **Detection is heuristic, not semantic.** Layers 1–4 are pattern/static heuristics. A novel phrasing, an unmodeled quoting/encoding trick, or semantic prompt injection without an obvious shell vector can pass. A flag is "look here," not a verdict.
 - **L1 `skill_vetting`** is a static read-only scan, not a sandbox; typosquat detection covers a small known-package set over `requirements.txt`/`package.json`; homoglyph detection is best-effort (no confusables database). Files over the size cap are reported `UNSCANNED` and cannot resolve to `approved` — they are not scanned.
@@ -95,7 +95,7 @@ These are disclosed so the protection is neither over- nor under-claimed; see th
 
 ## Uninstalling (remove the hooks, too)
 
-`pip uninstall agent-shield` removes the package but **not** the harness hook wiring. If
+`pip uninstall ai-agent-shield` removes the package but **not** the harness hook wiring. If
 you wired the guards into a `PreToolUse` hook, you must also remove those two entries from
 your `settings.json` (the `Bash` → `agent_shield.bash_guard` and `Write|Edit|MultiEdit` →
 `agent_shield.write_guard` entries) and restart the harness. A hook that points at a removed

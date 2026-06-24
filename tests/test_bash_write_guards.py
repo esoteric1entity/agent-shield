@@ -74,6 +74,20 @@ BASH_GUARD_CASES = [
     ("reg add HKLM\\SOFTWARE\\Foo /v Bar /d Baz /f", "ask", "Windows registry"),
     ("net stop SomeService", "ask", "service/process manipulation"),
     ("taskkill /PID 1234 /F", "ask", "service/process manipulation"),
+    ("agent-shield-plugin disable", "ask", "Disabling agent-shield runtime guard"),
+    ("agent-shield-plugin --project . disable", "ask", "Disabling agent-shield runtime guard"),
+    ("agent-shield-plugin --harness claude_code disable", "ask", "Disabling agent-shield runtime guard"),
+    ("agent-shield-plugin \"disable\"", "ask", "Disabling agent-shield runtime guard"),
+    ("agent-shield-plugin --project . \"disable\"", "ask", "Disabling agent-shield runtime guard"),
+    ("python -m agent_shield.plugin_cli disable", "ask", "Disabling agent-shield runtime guard"),
+    ("python3.11 -m agent_shield.plugin_cli disable", "ask", "Disabling agent-shield runtime guard"),
+    ("python.exe -m agent_shield.plugin_cli disable", "ask", "Disabling agent-shield runtime guard"),
+    ("py -m agent_shield.plugin_cli disable", "ask", "Disabling agent-shield runtime guard"),
+    ("python -m agent_shield.plugin_cli --project . disable", "ask", "Disabling agent-shield runtime guard"),
+    ("bash -c 'agent-shield-plugin disable'", "ask", "Disabling agent-shield runtime guard"),
+    ("bash -c 'agent-shield-plugin --project . disable --force'", "ask", "Disabling agent-shield runtime guard"),
+    # Negative: the allowlisted base command must NOT be treated as a disable.
+    ("agent-shield-plugin enable", "allow", None),
 
     # --- GREEN tier (allow — silent pass) ---
     ("ls -la /home/user", "allow", None),

@@ -124,7 +124,13 @@ _CMD_START: Final[str] = r"(?:^|[;&|]|" + _SHELL_INTRO + r")\s*(?:\w+=\S*\s+)*"
 # RED TIER patterns — Hard block. Catastrophic/destructive.
 # Order matters: more-specific patterns first.
 # =============================================================================
-_RED_PATTERNS: Final[tuple[tuple[re.Pattern[str] | _LineStagedSearch, str], ...]] = (
+_RED_PATTERNS: Final[
+    tuple[tuple[re.Pattern[str] | _LineStagedSearch, str, str], ...]
+] = (
+    # Each entry is (pattern, reason, pattern_id). The ``pattern_id`` is a short
+    # descriptive snake_case slug single-sourced HERE (the RED table is the one
+    # source of truth — ``is_red()`` and ``--red-only`` read it, no codegen/drift).
+    # The regexes and reasons are UNCHANGED; only the id field is added.
     # Destructive rm targeting root
     (
         # A trailing shell separator/terminator/quote
@@ -132,29 +138,35 @@ _RED_PATTERNS: Final[tuple[tuple[re.Pattern[str] | _LineStagedSearch, str], ...]
         # the old `(\s|$|\*)` tail downgraded it to YELLOW. Mirrored in bash-guard.sh.
         re.compile(r"rm\s+" + _RM_RF + r"\s+(?:-{1,2}\S+\s+)*/([\s;&|<>)'\"]|$|\*)", _FLAGS),
         "Destructive rm -rf targeting root directory",
+        "rm_recursive_root",
     ),
     # Cheap literal evasions of the above:
     # quoted root, split flags, home/cwd targets.
     (
         re.compile(r"rm\s+" + _RM_RF + r"""\s+(?:-{1,2}\S+\s+)*["']/["']""", _FLAGS),
         "Destructive rm -rf targeting root directory (quoted)",
+        "rm_recursive_root_quoted",
     ),
     (
         re.compile(r"rm\s+" + _RM_SPLIT + r"\s+(?:-{1,2}\S+\s+)*/([\s;&|<>)'\"]|$|\*)", _FLAGS),
         "Destructive rm -rf targeting root directory (split flags)",
+        "rm_recursive_root_split",
     ),
     (
         re.compile(r"rm\s+" + _RM_RF + r"\s+(?:-{1,2}\S+\s+)*(~|\$HOME)/?([\s;&|<>)]|$)", _FLAGS),
         "Destructive rm -rf targeting home directory",
+        "rm_recursive_home",
     ),
     (
         re.compile(r"rm\s+" + _RM_RF + r"\s+(?:-{1,2}\S+\s+)*\.\.?([\s;&|<>)]|$)", _FLAGS),
         "Destructive rm -rf targeting current/parent directory",
+        "rm_recursive_cwd_parent",
     ),
     # Destructive rm targeting Windows system paths
     (
         re.compile(r"rm\s+" + _RM_RF + r"\s+(?:-{1,2}\S+\s+)*/c/(Windows|Program|Users\s*$)", _FLAGS),
         "Destructive rm -rf targeting system-critical Windows path",
+        "rm_recursive_windows_system",
     ),
     # Split-flag form (rm -r -f, -rv -f) at the non-root critical targets —
     # mirrors the single-token cluster patterns above so RED coverage is uniform
@@ -163,23 +175,28 @@ _RED_PATTERNS: Final[tuple[tuple[re.Pattern[str] | _LineStagedSearch, str], ...]
     (
         re.compile(r"rm\s+" + _RM_SPLIT + r"""\s+(?:-{1,2}\S+\s+)*["']/["']""", _FLAGS),
         "Destructive rm -rf targeting root directory (quoted)",
+        "rm_recursive_root_quoted_split",
     ),
     (
         re.compile(r"rm\s+" + _RM_SPLIT + r"\s+(?:-{1,2}\S+\s+)*(~|\$HOME)/?([\s;&|<>)]|$)", _FLAGS),
         "Destructive rm -rf targeting home directory",
+        "rm_recursive_home_split",
     ),
     (
         re.compile(r"rm\s+" + _RM_SPLIT + r"\s+(?:-{1,2}\S+\s+)*\.\.?([\s;&|<>)]|$)", _FLAGS),
         "Destructive rm -rf targeting current/parent directory",
+        "rm_recursive_cwd_parent_split",
     ),
     (
         re.compile(r"rm\s+" + _RM_SPLIT + r"\s+(?:-{1,2}\S+\s+)*/c/(Windows|Program|Users\s*$)", _FLAGS),
         "Destructive rm -rf targeting system-critical Windows path",
+        "rm_recursive_windows_system_split",
     ),
     # rm --no-preserve-root
     (
         re.compile(r"rm\s+--no-preserve-root", _FLAGS),
         "rm with --no-preserve-root flag",
+        "rm_no_preserve_root",
     ),
     # Pipe-to-shell (remote code execution)
     (
@@ -187,11 +204,13 @@ _RED_PATTERNS: Final[tuple[tuple[re.Pattern[str] | _LineStagedSearch, str], ...]
             r"(curl|wget|fetch)\s.*\|\s*(bash|sh|zsh|powershell|pwsh|cmd)", _FLAGS
         ),
         "Pipe-to-shell: downloading and executing remote code",
+        "pipe_to_shell",
     ),
     # Pipe-to-source
     (
         re.compile(r"(curl|wget).*\|\s*source", _FLAGS),
         "Pipe-to-source: downloading and sourcing remote code",
+        "pipe_to_source",
     ),
     # Execution forms that skip the
     # download-pipe shape: decode-then-execute, and process substitution.
@@ -204,15 +223,18 @@ _RED_PATTERNS: Final[tuple[tuple[re.Pattern[str] | _LineStagedSearch, str], ...]
             _FLAGS,
         ),
         "Decode-and-execute pipeline (obfuscated remote/embedded code)",
+        "decode_and_execute",
     ),
     (
         re.compile(r"(bash|sh|zsh)\s+<\(\s*(curl|wget|fetch)", _FLAGS),
         "Executing remote code via process substitution",
+        "exec_process_substitution",
     ),
     # Encoded PowerShell
     (
         re.compile(r"powershell.*-[eE]nc(odedCommand)?", _FLAGS),
         "Encoded PowerShell command (potential obfuscation)",
+        "powershell_encoded",
     ),
     # Fork bomb — whitespace-tolerant: the classic
     # ``:(){ :|:&};:`` is routinely written with spaces (``:(){ :|:& };:``,
@@ -222,6 +244,7 @@ _RED_PATTERNS: Final[tuple[tuple[re.Pattern[str] | _LineStagedSearch, str], ...]
     (
         re.compile(r":\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:", re.ASCII),
         "Fork bomb detected",
+        "fork_bomb",
     ),
     # Credential exfiltration via network tools.
     # Hardening fix (2026-06-08): the previous pattern `\$[A-Z_]*`
@@ -239,6 +262,7 @@ _RED_PATTERNS: Final[tuple[tuple[re.Pattern[str] | _LineStagedSearch, str], ...]
             r"\$\{?[A-Z_]*(TOKEN|KEY|SECRET|PASSWORD|CRED)",
         ),
         "Potential credential exfiltration via network",
+        "cred_exfil_network",
     ),
     # Credential-FILE exfiltration: the env-var form above was RED
     # while uploading the key FILE itself was only ask/allow. Upload flags with
@@ -250,6 +274,7 @@ _RED_PATTERNS: Final[tuple[tuple[re.Pattern[str] | _LineStagedSearch, str], ...]
             r"(\.pem|\.key|id_rsa|id_ed25519|id_ecdsa|id_dsa|\.ssh/|\.aws/|\.env\b|credentials|secrets|token)",
         ),
         "Uploading a credential/secret file to the network",
+        "cred_file_upload",
     ),
     (
         _LineStagedSearch(
@@ -257,6 +282,7 @@ _RED_PATTERNS: Final[tuple[tuple[re.Pattern[str] | _LineStagedSearch, str], ...]
             r"\|\s*(nc|ncat|curl|wget)\s",
         ),
         "Piping a local secret file to a network tool",
+        "cred_file_pipe_network",
     ),
     # Disk format — note: bash source used `mkfs\s` which missed `mkfs.ext4` (variant
     # filesystem types). `mkfs(\.|\s)` covers `mkfs `, `mkfs.ext4`, `mkfs.btrfs`, etc.
@@ -266,10 +292,12 @@ _RED_PATTERNS: Final[tuple[tuple[re.Pattern[str] | _LineStagedSearch, str], ...]
     (
         re.compile(_CMD_START + r"(sudo\s+)?mkfs(\.|\s)", _FLAGS_ML),
         "Disk format operation detected",
+        "disk_format_mkfs",
     ),
     (
         re.compile(_CMD_START + r"(sudo\s+)?(format\s+[a-z]:|wipefs\s)", _FLAGS_ML),
         "Disk format/wipe operation detected (Windows-native or wipefs form)",
+        "disk_format_wipe",
     ),
     # Raw disk write — target list instead of bare `/dev/` (fix:
     # `of=/dev/null` is a sink idiom, not a disk write), command-position anchored.
@@ -281,11 +309,13 @@ _RED_PATTERNS: Final[tuple[tuple[re.Pattern[str] | _LineStagedSearch, str], ...]
             _FLAGS_ML,
         ),
         "Raw disk write operation detected",
+        "raw_disk_write",
     ),
     # Write redirect to Windows system directory
     (
         re.compile(r">\s*/c/Windows/", _FLAGS),
         "Write redirect to Windows system directory",
+        "write_redirect_windows_system",
     ),
 )
 
@@ -364,6 +394,24 @@ _YELLOW_PATTERNS: Final[tuple[tuple[re.Pattern[str], str], ...]] = (
         re.compile(r"(net\s+stop|taskkill|sc\s+delete)", _FLAGS),
         "System service/process manipulation",
     ),
+    # Disabling the agent-shield runtime guard — must never be silent.
+    # Matches the console script and the real module form, even when wrapped
+    # inside bash -c / eval / xargs or quoted. Tolerates interspersed options
+    # (e.g. ``--project DIR``) between the program name and ``disable``.
+    # Disabling the agent-shield runtime guard — must never be silent.
+    # Uses a single contiguous regex (not staged search) to keep Python/bash
+    # parity exact: the program must be at command position, followed by option
+    # tokens, then the literal subcommand ``disable``. Quoted subcommands and
+    # common interpreter spellings (python3.11, python.exe, py) are caught.
+    (
+        re.compile(
+            _CMD_START
+            + r"(agent-shield-plugin|(python(?:3(\.\d+)?|\.exe)?|py)\s+-m\s+agent_shield\.plugin_cli)\s+"
+            + r"(?:\S+\s+)*['\"]?disable['\"]?\b",
+            _FLAGS_ML,
+        ),
+        "Disabling agent-shield runtime guard — confirm intentional",
+    ),
 )
 
 
@@ -390,7 +438,7 @@ def check_command(cmd: str) -> GuardResult:
         )
 
     # RED tier — hard block (first match wins)
-    for pattern, reason in _RED_PATTERNS:
+    for pattern, reason, _pattern_id in _RED_PATTERNS:
         if pattern.search(cmd):
             return GuardResult(decision="deny", reason=reason)
 
@@ -401,6 +449,59 @@ def check_command(cmd: str) -> GuardResult:
 
     # GREEN tier — allow silently
     return GuardResult(decision="allow")
+
+
+def is_red(cmd: str) -> tuple[bool, str]:
+    """Return whether ``cmd`` hits a RED pattern, with its ``pattern_id``.
+
+    Reuses ``_RED_PATTERNS`` (the single source of truth) with the SAME
+    first-match-wins order as :func:`check_command`, so the reported
+    ``pattern_id`` always identifies the entry that ``check_command`` would
+    deny on.
+
+    Returns:
+        ``(True, pattern_id)`` on the first RED match, else ``(False, "")``.
+        Empty/None or over-cap input is treated as not-RED (``(False, "")``) —
+        consistent with the never-block-on-parse-error default; the size cap is
+        a ``check_command`` concern (this helper is a thin RED-only probe).
+    """
+    if not cmd or len(cmd) > _MAX_INPUT_CHARS:
+        return (False, "")
+    for pattern, _reason, pattern_id in _RED_PATTERNS:
+        if pattern.search(cmd):
+            return (True, pattern_id)
+    return (False, "")
+
+
+def is_red_or_over_cap(cmd: str) -> tuple[bool, str]:
+    """Error-path RED probe: fail-closed on over-cap input.
+
+    On the normal evaluation path ``is_red`` correctly returns ``(False, "")``
+    for over-cap input because ``check_command`` already short-circuits to
+    ``ask``. On the *error* path, however, we cannot evaluate at all, so an
+    oversized catastrophic command would otherwise fall through to the policy
+    tier (a fail-open hole for ``observe`` / ``open``). This wrapper treats any
+    input over ``_MAX_INPUT_CHARS`` as RED-by-default.
+
+    Returns:
+        ``(True, "over_cap")`` if ``len(cmd) > _MAX_INPUT_CHARS``; otherwise
+        delegates to :func:`is_red`.
+    """
+    if len(cmd) > _MAX_INPUT_CHARS:
+        return (True, "over_cap")
+    return is_red(cmd)
+
+
+def _run_red_only(command: str) -> int:
+    """``--red-only`` sub-mode: print ``{"red": bool, "pattern_id": str}``.
+
+    A library/CI probe that exposes the RED verdict alone (no YELLOW/GREEN,
+    no hook JSON). Always returns 0 — same never-crash contract as the hook
+    path.
+    """
+    red, pattern_id = is_red(command)
+    sys.stdout.write(json.dumps({"red": red, "pattern_id": pattern_id}))
+    return 0
 
 
 def _extract_command_from_hook_input(input_text: str) -> str:
@@ -449,8 +550,14 @@ def main(argv: list[str] | None = None) -> int:
     cannot be evaluated and is therefore allowed, matching the bash source's
     parse-failure default.
     """
-    _ = argv  # not used; reserved for future flags
     try:
+        if argv and "--red-only" in argv:
+            # --red-only <command>: emit only the RED verdict + pattern_id.
+            # The next positional (first non-flag token after --red-only) is the
+            # command; a missing positional yields the not-RED verdict (no crash).
+            rest = argv[argv.index("--red-only") + 1:]
+            command = next((tok for tok in rest if not tok.startswith("-")), "")
+            return _run_red_only(command)
         stream = getattr(sys.stdin, "buffer", None)
         if stream is not None:
             raw = stream.read(_MAX_READ_BYTES + 1)

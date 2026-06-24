@@ -7,7 +7,7 @@ type: software
 title: "agent-shield — the Security branch of the Agent Architect Stack"
 authors:
   - name: "PDuk Brainworks (esoteric1entity)"
-version: 0.1.0a4
+version: 0.2.0
 license: Apache-2.0
 repository-code: "https://github.com/esoteric1entity/agent-shield"
 url: "https://esoteric1entity.github.io/agent-architect-stack/"

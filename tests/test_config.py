@@ -74,7 +74,6 @@ def test_dataclasses_are_frozen():
     for obj in (cfg, cfg.audit, cfg.sanitize, cfg.structured_output, cfg.guard):
         assert dataclasses.is_dataclass(obj)
         with pytest.raises(dataclasses.FrozenInstanceError):
-            object.__setattr__  # sanity: frozen set must raise
             setattr(obj, "compliance", "x")
 
 
@@ -108,8 +107,14 @@ def test_each_preset_derives_audit_fields_from_audit(tmp_path):   # H12
         assert cfg.audit.retention_days == spec["retention_days"]
         assert cfg.audit.fail_mode == spec["fail_mode"]
         assert cfg.audit.content_fields_always == spec["content_fields_always"]
+        assert cfg.sanitize.strict == spec["sanitize_strict"]
         # and it must construct a real AuditLog
         audit.AuditLog(path=tmp_path / f"{name}.jsonl", preset=cfg.compliance)
+
+
+def test_strict_sanitize_compliance_is_derived_from_audit_presets():
+    expected = {name for name, spec in audit.PRESETS.items() if spec.get("sanitize_strict")}
+    assert set(config.STRICT_SANITIZE_COMPLIANCE) == expected
 
 
 def test_healthcare_preset_full_posture():
@@ -405,9 +410,12 @@ def test_no_config_input_can_drop_a_red_bash_command(tmp_path):    # H2
 # ===========================================================================
 # Group L: packaging / lazy import / import hygiene (H5, H16, H17)
 # ===========================================================================
-def test_config_in_all():
+def test_config_is_lazy_accessible_at_top_level():
     import agent_shield
-    assert "config" in agent_shield.__all__
+    # ``__all__`` intentionally keeps only GuardResult so ``from agent_shield import *``
+    # does not eager-load submodules; the submodule is still reachable via __getattr__.
+    assert "config" in agent_shield._LAZY_SUBMODULES
+    assert agent_shield.config is agent_shield.config  # resolves on demand
 
 
 def test_tomllib_available_under_floor():       # H17
@@ -419,7 +427,7 @@ def test_config_imports_are_stdlib_only():      # H16
     import ast
     from pathlib import Path
     src = Path(config.__file__).read_text(encoding="utf-8")
-    allowed = {"tomllib", "os", "pathlib", "dataclasses", "typing",
+    allowed = {"tomllib", "os", "sys", "pathlib", "dataclasses", "typing",
                "warnings", "__future__", "agent_shield"}
     roots = set()
     for node in ast.walk(ast.parse(src)):

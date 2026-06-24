@@ -93,7 +93,7 @@ def test_write_guard_separator_and_dotseg_bypass(path: str, expected: str):
 
 
 def test_normalize_path_collapses_separators_and_dotsegs():
-    n = write_guard._normalize_path
+    n = write_guard.normalize_path
     assert n("agent_shield//bash_guard.py") == "agent_shield/bash_guard.py"
     assert n("agent_shield/./bash_guard.py") == "agent_shield/bash_guard.py"
     assert n("agent_shield/x/../bash_guard.py") == "agent_shield/bash_guard.py"
@@ -211,7 +211,7 @@ def test_write_guard_oversize_path_is_capped_to_ask():
 
 
 def test_normalize_path_strips_disguises():
-    n = write_guard._normalize_path
+    n = write_guard.normalize_path
     assert n("agent_shield/Bash_Guard.py ") == "agent_shield/bash_guard.py"
     assert n("agent_shield/bash_guard.py.") == "agent_shield/bash_guard.py"
     assert n("agent_shield/bash_guard.py::$DATA") == "agent_shield/bash_guard.py"

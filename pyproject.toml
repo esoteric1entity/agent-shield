@@ -3,8 +3,8 @@ requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agent-shield"
-version = "0.1.0a4"
+name = "ai-agent-shield"
+version = "0.2.0"
 description = "Defensive overlay for AI agents — 8-layer architecture with harness-agnostic adapters; ships 6 of 8 layers (1 skill_vetting, 2 sanitize, 3 structured_output, 4 bash_guard+write_guard, 6 audit, 7 config) plus adapters for Claude Code (PreToolUse) and OpenClaw (before_tool_call)"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -38,6 +38,7 @@ agent-shield-bash-guard = "agent_shield.bash_guard:main"
 agent-shield-write-guard = "agent_shield.write_guard:main"
 agent-shield-vet = "agent_shield.skill_vetting:main"
 agent-shield-openclaw-guard = "agent_shield.adapters.openclaw:main"
+agent-shield-plugin = "agent_shield.plugin_cli:main"
 
 [project.urls]
 Homepage = "https://github.com/esoteric1entity/agent-shield"
