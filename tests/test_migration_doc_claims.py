@@ -29,7 +29,7 @@ def _extract_json_blocks_after(text: str, heading: str) -> list[str]:
     region = text[start:]
     # Determine the heading level so we stop at the next peer or higher heading.
     level = len(heading) - len(heading.lstrip("#"))
-    section_end_match = re.search(rf"\n#{"#" * (level - 1)} ", region)
+    section_end_match = re.search(r"\n#" + r"#" * (level - 1) + r" ", region)
     section = region[:section_end_match.start()] if section_end_match else region
     blocks: list[str] = []
     for match in re.finditer(r"```json\s*\n", section):
