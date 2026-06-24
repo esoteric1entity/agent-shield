@@ -44,8 +44,8 @@ Install (pick your door):
 # From the repo (the install path today)
 pip install git+https://github.com/esoteric1entity/agent-shield.git
 
-# From PyPI — not yet published; coming with the public release:
-#   pip install agent-shield
+# From PyPI:
+#   pip install ai-agent-shield
 ```
 
 Or **tell your agent**: clone the repo and say *"install this — read `INSTALL_AGENT.md` and follow it."* The agent walks a documented, consent-gated flow (it never touches your settings without showing you the diff).
@@ -336,7 +336,7 @@ The CLI reads `{"tool_input": {"command": "..."}}` (for `bash_guard`) or `{"tool
 
 Input that cannot be parsed at all cannot be evaluated and is **allowed** — see [Bypasses and limitations](#bypasses-and-limitations) for why, and what that means for you.
 
-For deployments without Python, the `tests/bash-guard.sh` and `tests/write-guard.sh` sources are **decision-equivalent** (verified to produce equivalent decisions; human-readable reason strings may differ in wording) and can be used directly. These sources are **not installed by `pip install agent-shield`**; copy them manually from the repository if you need them. When the bash guards find no working Python interpreter, RED checks additionally scan the raw hook JSON — degraded parsing fails **closed** for the dangerous tier.
+For deployments without Python, the `tests/bash-guard.sh` and `tests/write-guard.sh` sources are **decision-equivalent** (verified to produce equivalent decisions; human-readable reason strings may differ in wording) and can be used directly. These sources are **not installed by `pip install ai-agent-shield`**; copy them manually from the repository if you need them. When the bash guards find no working Python interpreter, RED checks additionally scan the raw hook JSON — degraded parsing fails **closed** for the dangerous tier.
 
 ---
 

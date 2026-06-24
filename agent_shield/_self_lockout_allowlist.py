@@ -18,21 +18,22 @@ import os
 
 from agent_shield import write_guard
 
-#: Repair/reinstall package commands. The package name must be the LITERAL
-#: ``agent-shield`` token (with optional extras and/or version specifier), OR
-#: an editable install whose FINAL path segment is ``agent-shield``. Flags may
-#: appear between the verb and the package name.
+#: Repair/reinstall package commands. The PyPI distribution name must be the
+#: LITERAL ``ai-agent-shield`` token (with optional extras and/or version
+#: specifier). Editable installs are allowed when their FINAL path segment is
+#: ``agent-shield`` (the repository directory name). Flags may appear between the
+#: verb and the package name.
 _ALLOWED_INSTALL_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(
         r"^\s*(pip|pip3|pipx|uv(?:\s+pip)?)\s+install\s+(?:--?\S+\s+)*-e\s+(?:.*[/\\])?agent-shield/?\s*$",
         re.IGNORECASE,
     ),
     re.compile(
-        r"^\s*(pip|pip3|pipx|uv(?:\s+pip)?)\s+install\s+(?:--?\S+\s+)*agent-shield(?:\[[^\]]+\])?(?:==[^\s]+)?(?:\[[^\]]+\])?\s*$",
+        r"^\s*(pip|pip3|pipx|uv(?:\s+pip)?)\s+install\s+(?:--?\S+\s+)*ai-agent-shield(?:\[[^\]]+\])?(?:==[^\s]+)?(?:\[[^\]]+\])?\s*$",
         re.IGNORECASE,
     ),
     re.compile(
-        r"^\s*(pip|pip3|pipx|uv(?:\s+pip)?)\s+(?:uninstall|upgrade)\s+(?:--?\S+\s+)*agent-shield(?:\[[^\]]+\])?(?:==[^\s]+)?(?:\[[^\]]+\])?\s*$",
+        r"^\s*(pip|pip3|pipx|uv(?:\s+pip)?)\s+(?:uninstall|upgrade)\s+(?:--?\S+\s+)*ai-agent-shield(?:\[[^\]]+\])?(?:==[^\s]+)?(?:\[[^\]]+\])?\s*$",
         re.IGNORECASE,
     ),
 )
@@ -48,9 +49,10 @@ _ALLOWED_PLUGIN_PATTERNS: tuple[re.Pattern[str], ...] = (
     ),
 )
 
-#: Diagnostic location probes.
+#: Diagnostic location probes for the plugin helper (the only top-level
+#: ``agent-shield-*`` console script an operator types interactively).
 _ALLOWED_PROBE_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"^\s*(which|command\s+-v|where)\s+agent-shield\s*$", re.IGNORECASE),
+    re.compile(r"^\s*(which|command\s+-v|where)\s+agent-shield-plugin\s*$", re.IGNORECASE),
 )
 
 #: Protected installation directories whose contents may be edited to repair

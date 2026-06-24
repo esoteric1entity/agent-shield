@@ -29,7 +29,7 @@ Probe (read-only) and report:
    PEP 668-managed system Pythons will refuse a bare pip install.
 2. **Harness:** Claude Code (`~/.claude/` exists)? OpenClaw? Other? Hooks wiring
    (Step 3) currently targets Claude Code; other harnesses use the library/CLI surface.
-3. **Existing install:** `pip show agent-shield` — if present, this is an upgrade.
+3. **Existing install:** `pip show ai-agent-shield` — if present, this is an upgrade.
 
 ## Step 2 — Install the package
 
@@ -38,7 +38,7 @@ Use the first available source, in this order:
 ```bash
 pip install git+https://github.com/esoteric1entity/agent-shield.git # from the repo (works today)
 pip install <package-dir>                                           # local source (clone/checkout)
-# pip install agent-shield                                          # PyPI — not yet published
+# pip install ai-agent-shield                                       # PyPI
 # No prebuilt wheel ships in the repo; to build one: `python -m build` then
 # `pip install dist/agent_shield-*.whl`.
 ```
@@ -131,8 +131,8 @@ in order:
 
    The CLI requires an interactive terminal for `disable`; in non-TTY environments pass
    `--force` only after explicit user confirmation.
-2. **Remove the package:** `pip uninstall -y agent-shield` (in the environment it was
-   installed into). Confirm with `pip show agent-shield` → no output.
+2. **Remove the package:** `pip uninstall -y ai-agent-shield` (in the environment it was
+   installed into). Confirm with `pip show ai-agent-shield` → no output.
 3. **Restart** the harness session so it reloads settings without the hooks.
 
 **Already uninstalled the package first?** If `agent-shield-plugin` is no longer on

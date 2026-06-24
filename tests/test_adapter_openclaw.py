@@ -458,7 +458,7 @@ def test_bash_cannot_evaluate_selfrepair_beats_red(fake_cfg, monkeypatch):
         lambda _cmd: GuardResult(decision="cannot_evaluate", trigger="timeout", action_tier="red"),
     )
 
-    result = openclaw.decide(_bash_event("pip install agent-shield"))
+    result = openclaw.decide(_bash_event("pip install ai-agent-shield"))
     assert result.decision == "allow"
 
     entries = _entries(Path(cfg.audit.path))

@@ -47,7 +47,7 @@ def _entries(path: Path):
 def test_all_outcome_reasons_appear_in_audit(outcome_reason, audit_log, tmp_path):
     # Drive each reason by picking the matching fake inputs/params.
     if outcome_reason == "allowed-selfrepair":
-        raw = "pip install agent-shield"
+        raw = "pip install ai-agent-shield"
         policy, attended = "closed", False
     elif outcome_reason == "denied-catastrophic-unevaluated":
         raw = "rm -rf /"

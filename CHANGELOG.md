@@ -10,33 +10,9 @@ per-finding engineering notes are kept in the project's internal records.
 
 ---
 
-## [0.1.0a5] — 2026-06-23 — error-path hardening + uninstall-safety CLI
-
-### Added
-- **Error-path resolver (B3).** `agent_shield/_error_policy.py` — deterministic resolution of `cannot_evaluate` outcomes into terminal `allow`/`ask`/`deny` decisions based on `error_policy` (`open`/`closed`/`ask`/`observe`), attended state, and trigger type.
-- **RED-only submode (B2).** Guards expose `is_red_or_over_cap()` for catastrophic-RED detection on the error path; pattern IDs are single-sourced and descriptive.
-- **RED-on-error (F3).** Even under `error_policy=open`, catastrophic RED patterns (e.g., `rm -rf /`) still deny when evaluation fails, preventing silent bypass of destructive commands.
-- **Self-lockout allowlist (F2).** `agent_shield/_self_lockout_allowlist.py` — whitelisted self-repair commands (e.g., `pip install agent-shield`) are allowed even when the guard is unavailable, preventing agents from locking themselves out of recovery.
-- **Telemetry / observe visibility (F1/F4).** `agent_shield/_telemetry.py` — per-session stderr banners and durable counters for `observe` policy `would-have-blocked` outcomes; structured `guard_unavailable` audit records with full context (trigger, action_tier, attended, harness).
-- **Audit cannot-evaluate outcomes (F1).** Both adapters now record `guard_unavailable` audit entries with structured details (`outcome_reason`, `trigger`, `guard_authoritative`, `harness`) on every error-path resolution.
-- **Phase P3 — uninstall-safety CLI.** `agent_shield/plugin_cli.py` — `agent-shield-plugin enable/disable/status` console script for Claude Code `PreToolUse` hook wiring, with atomic writes, timestamped backups, TTY confirmation, `--project` scope, and automatic cleanup of legacy hook shapes (including customised variants that still point at the old module target).
-- **Migration guide.** `docs/MIGRATION.md` documents the legacy-to-canonical wiring migration for Claude Code and OpenClaw, including the non-functional legacy alpha warning.
-- **Doc-claim safety tests.** `tests/test_migration_doc_claims.py` pins migration-guide shapes to `plugin_cli` constants and the example settings file; `tests/test_version_coherence.py` enforces one canonical version string across all shipped files.
-
-### Changed
-- **OpenClaw adapter** now routes `cannot_evaluate` through the error-policy resolver, matching the Claude Code adapter's error handling.
-- **Config loader** gains a harness-aware default `error_policy` (`closed` for OpenClaw, `observe` for Claude Code).
-- **Claude Code adapter** now records normal-path audit entries and routes `cannot_evaluate` through the error-policy resolver.
-
-### Security
-- **Error-path hardening.** All `cannot_evaluate` paths now resolve to terminal decisions; non-terminal values are defensively coerced to `deny`.
-- **Legacy alpha wiring correction.** Legacy Claude Code `hookEventName` + `toolNamePattern` wiring provided no protection — the command target (`python -m agent_shield.adapters.claude_code`) has no `__main__` surface. Users who wired during earlier alphas must migrate to the canonical `matcher` + `hooks` shape. See `docs/MIGRATION.md` for steps.
-
----
-
 ## [Unreleased]
 
-## [0.2.0] — 2026-06-23 — deferred items + release readiness
+## [0.2.0] — 2026-06-24 — deferred items + release readiness
 
 ### Added
 - **L1 `ENV_BULK` expansion.** Skill vetter now flags additional bulk environment reads: `Object.entries(process.env)`, `{...process.env}`, `os.environ.items()/values()/keys()`, and `list/tuple/set(os.environ)`.
@@ -56,6 +32,32 @@ per-finding engineering notes are kept in the project's internal records.
 - **Egress lint coverage widened** so dynamic-import and `os`-alias bypasses of the "no outbound calls / no native exec" invariant are caught by the AST suite.
 - **Anchor footgun closed** so a configured sink cannot be accidentally no-op'd by zero cadence.
 - **Skill vetting bounded** against symlink-escape and oversized-tree scan attacks.
+
+---
+
+## [0.1.0a5] — 2026-06-23 — error-path hardening + uninstall-safety CLI
+
+### Added
+- **Error-path resolver (B3).** `agent_shield/_error_policy.py` — deterministic resolution of `cannot_evaluate` outcomes into terminal `allow`/`ask`/`deny` decisions based on `error_policy` (`open`/`closed`/`ask`/`observe`), attended state, and trigger type.
+- **RED-only submode (B2).** Guards expose `is_red_or_over_cap()` for catastrophic-RED detection on the error path; pattern IDs are single-sourced and descriptive.
+- **RED-on-error (F3).** Even under `error_policy=open`, catastrophic RED patterns (e.g., `rm -rf /`) still deny when evaluation fails, preventing silent bypass of destructive commands.
+- **Self-lockout allowlist (F2).** `agent_shield/_self_lockout_allowlist.py` — whitelisted self-repair commands (e.g., `pip install ai-agent-shield`) are allowed even when the guard is unavailable, preventing agents from locking themselves out of recovery.
+- **Telemetry / observe visibility (F1/F4).** `agent_shield/_telemetry.py` — per-session stderr banners and durable counters for `observe` policy `would-have-blocked` outcomes; structured `guard_unavailable` audit records with full context (trigger, action_tier, attended, harness).
+- **Audit cannot-evaluate outcomes (F1).** Both adapters now record `guard_unavailable` audit entries with structured details (`outcome_reason`, `trigger`, `guard_authoritative`, `harness`) on every error-path resolution.
+- **Phase P3 — uninstall-safety CLI.** `agent_shield/plugin_cli.py` — `agent-shield-plugin enable/disable/status` console script for Claude Code `PreToolUse` hook wiring, with atomic writes, timestamped backups, TTY confirmation, `--project` scope, and automatic cleanup of legacy hook shapes (including customised variants that still point at the old module target).
+- **Migration guide.** `docs/MIGRATION.md` documents the legacy-to-canonical wiring migration for Claude Code and OpenClaw, including the non-functional legacy alpha warning.
+- **Doc-claim safety tests.** `tests/test_migration_doc_claims.py` pins migration-guide shapes to `plugin_cli` constants and the example settings file; `tests/test_version_coherence.py` enforces one canonical version string across all shipped files.
+
+### Changed
+- **OpenClaw adapter** now routes `cannot_evaluate` through the error-policy resolver, matching the Claude Code adapter's error handling.
+- **Config loader** gains a harness-aware default `error_policy` (`closed` for OpenClaw, `observe` for Claude Code).
+- **Claude Code adapter** now records normal-path audit entries and routes `cannot_evaluate` through the error-policy resolver.
+
+### Security
+- **Error-path hardening.** All `cannot_evaluate` paths now resolve to terminal decisions; non-terminal values are defensively coerced to `deny`.
+- **Legacy alpha wiring correction.** Legacy Claude Code `hookEventName` + `toolNamePattern` wiring provided no protection — the command target (`python -m agent_shield.adapters.claude_code`) has no `__main__` surface. Users who wired during earlier alphas must migrate to the canonical `matcher` + `hooks` shape. See `docs/MIGRATION.md` for steps.
+
+---
 
 ## [0.1.0a4] — 2026-06-19 — readiness-hardening alpha + Release A
 

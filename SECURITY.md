@@ -95,7 +95,7 @@ These are disclosed so the protection is neither over- nor under-claimed; see th
 
 ## Uninstalling (remove the hooks, too)
 
-`pip uninstall agent-shield` removes the package but **not** the harness hook wiring. If
+`pip uninstall ai-agent-shield` removes the package but **not** the harness hook wiring. If
 you wired the guards into a `PreToolUse` hook, you must also remove those two entries from
 your `settings.json` (the `Bash` → `agent_shield.bash_guard` and `Write|Edit|MultiEdit` →
 `agent_shield.write_guard` entries) and restart the harness. A hook that points at a removed

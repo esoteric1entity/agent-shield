@@ -296,7 +296,7 @@ def test_bash_cannot_evaluate_selfrepair_beats_red(make_event, fake_cfg, monkeyp
         lambda _cmd: GuardResult(decision="cannot_evaluate", trigger="timeout", action_tier="red"),
     )
 
-    result = claude_code.decide(make_event("Bash", command="pip install agent-shield"))
+    result = claude_code.decide(make_event("Bash", command="pip install ai-agent-shield"))
     assert result.decision == "allow"
 
     entries = _entries(Path(cfg.audit.path))

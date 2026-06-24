@@ -45,7 +45,7 @@ Uninstalling is two steps — remove the package **and** the hooks. Skipping the
 
 ```bash
 # 1. Remove the package
-pip uninstall -y agent-shield
+pip uninstall -y ai-agent-shield
 
 # 2. Back up, then remove the two agent-shield PreToolUse entries you added
 cp ~/.claude/settings.json ~/.claude/settings.json.bak
