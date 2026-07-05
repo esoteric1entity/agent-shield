@@ -142,8 +142,28 @@ _RED_PATTERNS: Final[tuple[tuple[re.Pattern[str], str, str], ...]] = (
     # An attacker / confused agent could `Edit agent_shield/bash_guard.py` to neuter
     # the RED tier, and write_guard would silently `allow` it. The `(^|/)` prefix
     # covers both vendored (`agent_shield/...`) and site-packages install layouts.
+    #
+    # P0 fix (2026-07-05): the pattern above enumerated 4 filenames; v0.2.0
+    # added 8 more modules (_error_policy.py, _self_lockout_allowlist.py,
+    # _telemetry.py, config.py, audit.py, plugin_cli.py, adapters/*.py, ...)
+    # and nobody updated this list -- they shipped silently unprotected. Fixed
+    # structurally: ANY .py file anywhere under agent_shield/ (including
+    # subdirectories, e.g. adapters/) is RED. This package has no legitimate
+    # "trusted but unguarded" helper module -- every file in it is part of the
+    # security surface. `agent_shield_helpers/` and `*.pyx`/`*.pyc` still do
+    # not match (see test_write_guard_protects_every_package_module +
+    # BYPASS_VARIANT_CASES negatives in test_security_hardening.py).
+    #
+    # LINEARITY (audit-#3 bug class): the naive form
+    # `(^|/)agent_shield/(?:.+/)?[^/]+\.py$` is quadratic on adversarial input
+    # -- `agent_shield/` repeated gives n/13 match-start positions, each
+    # backtracking O(n) (measured: 260KB path = 16s = hook-timeout DoS on
+    # attacker-controlled file_path). This form is linear: `^`-anchored
+    # (single start position), one lookahead pass for the `.py` suffix, one
+    # scan for an `agent_shield/` path segment. `(?s)` keeps decisions
+    # newline-robust and matches the bash mirror's line-oriented grep pair.
     (
-        re.compile(r"(^|/)agent_shield/(bash_guard|write_guard|_result|__init__)\.py$"),
+        re.compile(r"(?s)^(?=.*\.py$)(?:.*/)?agent_shield/"),
         "Cannot modify active agent-shield guard module (self-modification attack vector)",
         "self_modify_guard_module",
     ),

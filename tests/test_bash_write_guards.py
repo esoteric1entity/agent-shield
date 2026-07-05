@@ -193,9 +193,34 @@ WRITE_GUARD_CASES = [
     ("./agent_shield/__init__.py", "deny", "self-modification"),
     ("/home/user/.openclaw/agent_shield/bash_guard.py", "deny", "self-modification"),
     ("/usr/lib/python3.12/site-packages/agent_shield/write_guard.py", "deny", "self-modification"),
-    # Negative case: a non-guard file under agent_shield/ should NOT be denied.
-    # (If we ever add tests/ subpackage or utils/, those should be allow/ask, not deny.)
-    ("./agent_shield/tests/test_helpers.py", "allow", None),
+    # P0 fix (2026-07-05): the RED pattern used to enumerate 4 filenames, which
+    # silently left every v0.2 module unprotected (an agent could Edit
+    # _error_policy.py or config.py to neuter enforcement with no block).
+    # Fixed to a structural match: ANY .py file under agent_shield/ is RED.
+    ("./agent_shield/_error_policy.py", "deny", "self-modification"),
+    ("./agent_shield/_self_lockout_allowlist.py", "deny", "self-modification"),
+    ("./agent_shield/_telemetry.py", "deny", "self-modification"),
+    ("./agent_shield/config.py", "deny", "self-modification"),
+    ("./agent_shield/audit.py", "deny", "self-modification"),
+    ("./agent_shield/plugin_cli.py", "deny", "self-modification"),
+    ("./agent_shield/sanitize.py", "deny", "self-modification"),
+    ("./agent_shield/skill_vetting.py", "deny", "self-modification"),
+    ("./agent_shield/structured_output.py", "deny", "self-modification"),
+    ("./agent_shield/adapters/claude_code.py", "deny", "self-modification"),
+    ("./agent_shield/adapters/openclaw.py", "deny", "self-modification"),
+    # Negative case UPDATED (2026-07-05, was "allow"): every .py file under
+    # agent_shield/ is part of the security surface -- this package has no
+    # legitimate "trusted but unguarded" helper subpackage. A genuinely
+    # non-critical future module would need an explicit, reviewed carve-out,
+    # not a silent default-allow.
+    ("./agent_shield/tests/test_helpers.py", "deny", "self-modification"),
+    # Non-.py files under agent_shield/ are NOT guarded by this pattern
+    # (different extension -- py.typed, __pycache__/*.pyc are unaffected).
+    ("./agent_shield/py.typed", "allow", None),
+    # Pathological bare ".py" filename -- both mirrors deny (the Python
+    # lookahead form and the bash two-grep AND agree; the conservative
+    # direction for a file this weird inside the package is deny).
+    ("agent_shield/.py", "deny", "self-modification"),
 
     # --- RED tier (deny) — normalization bypass variants.
     # Trailing space/dot and NTFS ADS suffix resolve to the SAME file on Windows;
@@ -370,6 +395,65 @@ def test_write_guard_python(path: str, expected_decision: str, expected_reason: 
             f"Expected pattern: {expected_reason}\n"
             f"Got: {result.reason}"
         )
+
+
+def test_write_guard_protects_every_package_module():
+    """Regression pin (P0 fix, 2026-07-05): every .py file actually shipping in
+    agent_shield/ must trip the self-modification RED tier.
+
+    This is filesystem-driven, not an enumerated list -- it exists so a FUTURE
+    module added to the package without a matching guard-pattern update fails
+    THIS test immediately, instead of shipping silently unprotected (which is
+    exactly how the original gap happened: the pattern enumerated 4 names and
+    nobody updated it when 0.2.0 added 8 more modules).
+    """
+    package_root = Path(__file__).parent.parent / "agent_shield"
+    py_files = sorted(
+        p for p in package_root.rglob("*.py") if "__pycache__" not in p.parts
+    )
+    assert len(py_files) >= 14, (
+        f"Expected at least 14 .py files in the package, found {len(py_files)} -- "
+        "the discovery glob itself may be broken."
+    )
+    unprotected = []
+    for p in py_files:
+        rel = p.relative_to(package_root.parent).as_posix()
+        result = write_guard.check_path(rel)
+        if result.decision != "deny":
+            unprotected.append((rel, result.decision))
+    assert not unprotected, (
+        "The following agent_shield/*.py modules are NOT covered by the "
+        "self-modification RED pattern -- add them to write_guard.py's "
+        f"_RED_PATTERNS (and mirror in write-guard.sh): {unprotected}"
+    )
+
+
+def test_write_guard_self_modification_pattern_is_linear_time():
+    """Regression pin (P0 fix adversarial eval, 2026-07-05): the first draft of
+    the widened self-modification pattern (`(^|/)agent_shield/(?:.+/)?[^/]+\\.py$`)
+    was quadratic on adversarial input -- `agent_shield/` repeated gives one
+    match-start position per repeat, each backtracking O(n). Measured: a 260KB
+    crafted file_path took ~16s, a hook-timeout DoS on attacker-controlled
+    input (the same bug class as audit #3's bash_guard ReDoS). The shipped
+    `^`-anchored lookahead form is linear. Budget mirrors the other linearity
+    tests in this suite: generous for CI variance, far below the pre-fix time.
+    """
+    import time
+
+    cases = [
+        "agent_shield/" * 20_000 + "x.txt",   # many segments, suffix fails
+        "agent_shield/" * 20_000 + "x.py",    # many segments, suffix matches
+        "a/" * 100_000 + "x.py",              # many slashes, no guarded segment
+    ]
+    for path in cases:
+        start = time.perf_counter()
+        result = write_guard.check_path(path)
+        elapsed = time.perf_counter() - start
+        assert elapsed < 1.0, (
+            f"self-modification pattern took {elapsed:.2f}s on {len(path)}-char "
+            "path (ReDoS regression -- linear should be milliseconds)"
+        )
+        assert result.decision in ("allow", "ask", "deny")
 
 
 @pytest.mark.parametrize("path, expected_decision, expected_reason", WRITE_GUARD_CASES)

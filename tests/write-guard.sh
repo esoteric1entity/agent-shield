@@ -134,7 +134,15 @@ BLOCK_REASON=""
 # deployment, leaving `agent_shield/*.py` (the canonical guards) UNPROTECTED.
 # The `(^|/)` prefix covers both vendored (`agent_shield/...`) and site-packages
 # install layouts. Mirrored in agent_shield/write_guard.py _RED_PATTERNS.
-if echo "$NORM_PATH" | grep -qE '(^|/)agent_shield/(bash_guard|write_guard|_result|__init__)\.py$'; then
+#
+# P0 fix (2026-07-05): widened from an enumerated 4-filename list (which
+# silently missed every v0.2 module) to a structural match -- ANY .py file
+# anywhere under agent_shield/ is RED. Expressed as an AND of two
+# single-condition greps (has an agent_shield/ path segment; ends in .py)
+# for byte-equivalent decisions with the Python mirror's linear-time
+# lookahead form. Mirrored in agent_shield/write_guard.py _RED_PATTERNS
+# (Python side comment has the full rationale incl. the ReDoS analysis).
+if echo "$NORM_PATH" | grep -qE '(^|/)agent_shield/' && echo "$NORM_PATH" | grep -qE '\.py$'; then
     BLOCK_REASON="Cannot modify active agent-shield guard module (self-modification attack vector)"
 
 # The hooks themselves (self-modification attack vector)
