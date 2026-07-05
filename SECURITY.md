@@ -8,7 +8,8 @@ Until v1.0.0, the **latest minor release** is the only version that receives sec
 
 | Version | Status | Security fixes |
 |---|---|---|
-| `0.1.x` | ✅ active alpha | Yes (latest pre-release only) |
+| `0.2.x` | ✅ active alpha | Yes (latest release only) |
+| `0.1.x` | ⚠️ superseded | No — upgrade to `0.2.x` |
 | `< 0.1` | — | None — not a released line |
 
 Once `1.0.0` ships, the policy will be revised to support the most recent two minor versions for the security window stated in the release notes.

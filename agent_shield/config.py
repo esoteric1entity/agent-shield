@@ -10,7 +10,7 @@ once, and the typed slices each layer consumes.
     cfg.sanitize.strict                       # bool
     cfg.structured_output.mode                # "strict" | "lenient"
 
-    # opt-in wiring (v0.1): callers pass slices explicitly; the guards do NOT
+    # opt-in wiring (current): callers pass slices explicitly; the guards do NOT
     # auto-load config (no hot-path file I/O, no eager import).
     from agent_shield import audit
     log = audit.AuditLog(path=cfg.audit.path, preset=cfg.compliance)
@@ -25,7 +25,7 @@ Hard guarantees:
   - **Precedence.** built-in defaults < config file < environment < explicit kwargs.
   - **Not a trust boundary.** Config carries policy/paths, never secrets, and
     cannot remove or relax a built-in guard pattern (no pattern-injection keys
-    ship in v0.1). The config file itself is a ``write_guard`` YELLOW candidate.
+    ship in this release). The config file itself is a ``write_guard`` YELLOW candidate.
 
 Stdlib-only; ``tomllib`` is unconditionally available on the package's >=3.11
 floor (read-only — users edit the file, we only read it, in BINARY mode).
@@ -151,7 +151,7 @@ _FALSE_TOKENS = frozenset({"0", "false", "no", "off"})
 @dataclass(frozen=True)
 class AuditConfig:
     """Audit-layer slice. ``retention_days`` / ``fail_mode`` / ``content_fields_always``
-    are DERIVED from the compliance preset (read-only reported values in v0.1)."""
+    are DERIVED from the compliance preset (read-only reported values in this release)."""
 
     path: str = DEFAULT_AUDIT_PATH
     retention_days: int = 90

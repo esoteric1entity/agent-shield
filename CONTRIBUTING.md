@@ -126,7 +126,7 @@ These can be in code comments, README sections, or the relevant branch's decisio
 
 ## Review process
 
-1. **Automated checks** run on every PR (CI is set up at v0.5+; for v0 the project lead reviews manually).
+1. **Automated checks** run on every PR — CI (`test.yml`) runs the full test suite; merge requires it green.
 2. **One approving review** from a maintainer is required for merge.
 3. **Reviewer may request changes** — address each comment, then re-request review.
 4. **After approval**, the maintainer (or you, if you have write access) merges the PR using "Squash and merge" to keep the main branch history clean.
@@ -144,7 +144,7 @@ Contributors are listed in [`AUTHORS.md`](./AUTHORS.md) in alphabetical order. Y
 
 ## Releasing (maintainers)
 
-When bumping the version, keep these in lockstep so they never drift: `pyproject.toml` (`version`), `CITATION.cff` (`version`), the `agent_shield/__init__.py` metadata fallback, and the README status badge — then tag. A `v*` git tag triggers the PyPI publish workflow, so tag only once all of the above agree.
+When bumping the version, keep these in lockstep so they never drift: `pyproject.toml` (`version`), `CITATION.cff` (`version`), the `agent_shield/__init__.py` metadata fallback, the README status badge, `.github/ISSUE_TEMPLATE/bug_report.yml`, and `agent_shield/adapters/openclaw_plugin/package.json` — then tag. `tests/test_version_coherence.py` pins all six against `pyproject.toml` as the source of truth; run it locally before tagging. A `v*` git tag triggers the PyPI publish workflow, so tag only once all of the above agree.
 
 ## Questions?
 

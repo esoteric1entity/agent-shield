@@ -26,7 +26,7 @@ cfg.sanitize.strict                 # bool
 cfg.structured_output.mode          # "strict" | "lenient"
 ```
 
-## Opt-in wiring (v0.1)
+## Opt-in wiring (current)
 
 The guards do **not** auto-load config — they take no hot-path file I/O and stay
 exactly as reviewed. Callers pass the slice they need:
@@ -116,10 +116,10 @@ error_policy = "closed"         # open | closed | ask | observe
 `audit.retention_days`, `audit.fail_mode`, and `audit.content_fields_always` are
 **derived from the compliance preset and reported read-only** — there is no
 writable override for them in this release (the audit layer has no such constructor
-argument; see *Deferred to v0.2*).
+argument; see *Deferred*).
 
 Unknown keys and unknown tables are **ignored** (no crash). In particular there
-are **no `extra_red` / `extra_yellow` keys** in v0.1 — a config that could append
+are **no `extra_red` / `extra_yellow` keys** in this release — a config that could append
 to, let alone remove from, a guard's pattern tiers is a policy-weakening surface
 and is deferred to a post-v0.2.0 release with its own review.
 
@@ -137,7 +137,7 @@ single-sources that table rather than re-declaring it, so the two can never drif
 | `biotech` | 365 days | `closed` | 11-field (content SHA-256) | `true` |
 
 `biotech` is semantically identical to `healthcare` today. There is **no
-`enterprise` preset** in v0.1: it has no backing in the audit layer and would
+`enterprise` preset** in this release: it has no backing in the audit layer and would
 crash `AuditLog`. An `enterprise` tier, if added, must land in `audit.PRESETS`
 first (with concrete retention / fail-mode / content semantics and a pinning
 test), then surface here.
@@ -235,7 +235,7 @@ deliberately does not own them, so each env name has exactly one reader.
 - **Not a trust boundary.** Config carries policy and paths only. An attacker who
   can edit it can weaken posture (that is why the config file is a `write_guard`
   YELLOW target) — it cannot strengthen security on its own.
-- **The config file cannot weaken a built-in guard.** In v0.1 the guards do not
+- **The config file cannot weaken a built-in guard.** Through v0.2, the guards do not
   read config; their RED/YELLOW pattern tiers are hard-coded. No config input can
   drop a built-in RED command below `deny`.
 - **A non-default `$AGENT_SHIELD_CONFIG` location is not guarded.** `write_guard`
@@ -246,12 +246,12 @@ deliberately does not own them, so each env name has exactly one reader.
 - **No secrets.** Do not put tokens or credentials in the config; it is plaintext
   policy. Credentials belong in the environment / a secrets manager.
 - **TOML only.** YAML is intentionally **rejected** (it would add a third-party
-  dependency and `yaml.load` is a code-execution footgun); JSON is not a v0.1
-  input either. The file is TOML, read with the stdlib `tomllib`.
+  dependency and `yaml.load` is a code-execution footgun); JSON is not a
+  supported input either. The file is TOML, read with the stdlib `tomllib`.
 
 ---
 
-## Deferred to v0.2 (documented, not built)
+## Deferred (documented, not yet built)
 
 - `extra_red` / `extra_yellow` (and any user-supplied guard patterns) — needs its
   own pre-mortem (regex-compile failure handling, a ReDoS / length budget, and
