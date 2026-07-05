@@ -8,7 +8,7 @@
 
 ---
 
-You are an agent installing **agent-shield 0.2.0** — a defensive overlay for AI
+You are an agent installing **agent-shield 0.2.1** — a defensive overlay for AI
 agents. The shipping surface (Layer 4) is two runtime guards, `bash_guard` and
 `write_guard`, used as a Python library or as harness hooks. Execute the steps below
 **in order**; never claim a step succeeded without checking its result.
@@ -43,7 +43,7 @@ pip install <package-dir>                                           # local sour
 # `pip install dist/agent_shield-*.whl`.
 ```
 
-Confirm the installed version matches the source: `python -c "import agent_shield; print(agent_shield.__version__)"` → `0.2.0` (the value is read from package metadata, so it always tracks `pyproject.toml`).
+Confirm the installed version matches the source: `python -c "import agent_shield; print(agent_shield.__version__)"` → `0.2.1` (the value is read from package metadata, so it always tracks `pyproject.toml`).
 
 ## Step 3 — Wire the hooks (Claude Code only; consent required)
 

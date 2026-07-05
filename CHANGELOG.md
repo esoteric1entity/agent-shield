@@ -12,6 +12,17 @@ per-finding engineering notes are kept in the project's internal records.
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-07-05 — self-protection hardening + doc hygiene
+
+### Security
+- **Self-modification RED tier widened to the whole package.** The guard pattern that blocks an agent from editing agent-shield's own enforcement code previously only covered 4 files (`bash_guard.py`, `write_guard.py`, `_result.py`, `__init__.py`); 11 modules added since 0.2.0 (`_error_policy.py`, `_self_lockout_allowlist.py`, `config.py`, `audit.py`, the harness adapters, and others) were unprotected. Now every `.py` file under `agent_shield/` is covered, with a filesystem-driven regression test so a future new module can't ship unprotected again.
+
+### Changed
+- Promoted `pip install ai-agent-shield` to the primary install path in the README (was commented out beneath the git-clone install).
+- `SECURITY.md`'s supported-versions table now reflects `0.2.x` as the active line.
+- Corrected stale `v0.1`-era language in `docs/CONFIGURATION.md` and `config.py` docstrings for constraints that still hold in `0.2.x`.
+- `CONTRIBUTING.md`'s CI description and version-bump checklist corrected (checklist was missing 2 of the 6 files the version-coherence test pins).
+
 ## [0.2.0] — 2026-06-24 — deferred items + release readiness
 
 ### Added

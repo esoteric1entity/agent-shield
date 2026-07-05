@@ -1,6 +1,6 @@
 """agent-shield — defensive overlay for AI agents.
 
-8-layer architecture; v0.2.0 ships 6 layers — skill_vetting (1), sanitize (2),
+8-layer architecture; v0.2.1 ships 6 layers — skill_vetting (1), sanitize (2),
 structured_output (3), bash_guard + write_guard (4, the runtime hooks), audit
 (6), config (7). Layers 0 (operational) and 5 (network egress) are pre-release.
 
@@ -24,11 +24,11 @@ def _resolve_version() -> str:
     try:
         from importlib.metadata import PackageNotFoundError, version
     except ImportError:  # pragma: no cover - importlib.metadata is stdlib on 3.11
-        return "0.2.0"
+        return "0.2.1"
     try:
         return version("agent-shield")
     except PackageNotFoundError:
-        return "0.2.0"
+        return "0.2.1"
 
 
 __version__ = _resolve_version()

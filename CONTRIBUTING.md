@@ -144,7 +144,7 @@ Contributors are listed in [`AUTHORS.md`](./AUTHORS.md) in alphabetical order. Y
 
 ## Releasing (maintainers)
 
-When bumping the version, keep these in lockstep so they never drift: `pyproject.toml` (`version`), `CITATION.cff` (`version`), the `agent_shield/__init__.py` metadata fallback, the README status badge, `.github/ISSUE_TEMPLATE/bug_report.yml`, and `agent_shield/adapters/openclaw_plugin/package.json` — then tag. `tests/test_version_coherence.py` pins all six against `pyproject.toml` as the source of truth; run it locally before tagging. A `v*` git tag triggers the PyPI publish workflow, so tag only once all of the above agree.
+When bumping the version, keep these in lockstep so they never drift: `pyproject.toml` (`version`), `CITATION.cff` (`version`), the `agent_shield/__init__.py` metadata fallback, `INSTALL_AGENT.md`, the README status badge, `.github/ISSUE_TEMPLATE/bug_report.yml`, and `agent_shield/adapters/openclaw_plugin/package.json` — then tag. `tests/test_version_coherence.py` pins all seven against `pyproject.toml` as the source of truth; run it locally before tagging. A `v*` git tag triggers the PyPI publish workflow, so tag only once all of the above agree.
 
 ## Questions?
 

@@ -5,7 +5,7 @@
 > *A **PDuk Brainworks** project. Sibling to the [Ultimate Memory Stack](https://github.com/esoteric1entity/ultimate-memory-stack). Apache-2.0.*
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Status: alpha](https://img.shields.io/badge/Status-v0.2.0_alpha-yellow.svg)](#project-status)
+[![Status: alpha](https://img.shields.io/badge/Status-v0.2.1_alpha-yellow.svg)](#project-status)
 [![Python: ≥3.11](https://img.shields.io/badge/Python-%E2%89%A53.11-green.svg)](pyproject.toml)
 [![Tests](https://github.com/esoteric1entity/agent-shield/actions/workflows/test.yml/badge.svg)](https://github.com/esoteric1entity/agent-shield/actions/workflows/test.yml)
 
