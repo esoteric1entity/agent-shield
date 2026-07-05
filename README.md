@@ -41,11 +41,11 @@ Layers 0 (operational/automation) and 5 (network egress) are in development.
 Install (pick your door):
 
 ```bash
-# From the repo (the install path today)
-pip install git+https://github.com/esoteric1entity/agent-shield.git
+# From PyPI (recommended):
+pip install ai-agent-shield
 
-# From PyPI:
-#   pip install ai-agent-shield
+# From the repo (latest main, unreleased changes):
+#   pip install git+https://github.com/esoteric1entity/agent-shield.git
 ```
 
 Or **tell your agent**: clone the repo and say *"install this — read `INSTALL_AGENT.md` and follow it."* The agent walks a documented, consent-gated flow (it never touches your settings without showing you the diff).
